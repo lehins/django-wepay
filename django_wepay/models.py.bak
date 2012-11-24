@@ -1,0 +1,297 @@
+from django.db import models
+from django.contrib.auth.models import User
+from django.contrib.localflavor.us.models import USStateField, USPostalCodeField
+from django.core.cache import cache
+
+from django_wepay import forms
+
+USER_STATE_CHOICES = (
+    ("registered", u"Registered"),
+    ("pending", u"Pending"),
+)
+
+ACCOUNT_STATUS_CHOICES = (
+    ("verified", u"Verified"),
+    ("unverified", u"Unverified"),
+)
+
+ACCOUNT_TYPE_CHOICES = (
+     ("personal", u"Personal"),
+     ("nonprofit", u"Non-profit"),
+     ("business", u"Business"),
+)
+
+CHECKOUT_STATE_CHOICES = (
+    ("new", u"New"),
+    ("authorized", u"Authorized"),
+    ("reserved", u"Reserved"),
+    ("captured", u"Captured"),
+    ("settled", u"Settled"),
+    ("cancelled", u"Cancelled"),
+    ("refunded", u"Refunded"),
+    ("charged back", u"Charged Back"),
+    ("failed", u"Failed"),
+    ("expired", u"Expired"),
+)
+
+CURRENCY_CHOICES = (
+    ("USD", u"US Dollar"),
+)
+
+FEE_PAYER_CHOICES = (
+    ("payer", u"Payer"),
+    ("payee", u"Payee"),
+)
+
+class MoneyField(models.DecimalField):
+    def __init__(self, *args, **kwargs):
+        if not 'decimal_places' in kwargs:
+            kwargs['decimal_places'] = 2
+        if not 'max_digits' in kwargs:
+            kwargs['max_digits'] = 11
+        super(MoneyField, self).__init__(*args, **kwargs)
+    
+    def formfield(self, **kwargs):
+        defaults = {
+            'max_digits': self.max_digits,
+            'decimal_places': self.decimal_places,
+            'form_class': forms.MoneyField,
+        }
+        defaults.update(kwargs)
+        return super(MoneyField, self).formfield(**defaults)
+
+class URLField(models.URLField):
+    def __init__(self, *args, **kwargs):
+        if not 'max_length' in kwargs:
+            kwargs['max_length'] = 2083
+        super(URLField, self).__init__(*args, **kwargs)
+
+
+class Address(models.Model):
+    address1 = models.CharField(max_length=64)
+    address2 = models.CharField(max_length=64)
+    city = models.CharField(max_length=64)
+    state = USStateField()
+    zip = USPostalCodeField()
+    country = models.CharField(max_length=32)
+
+
+class WPThemeManager(models.Manager):
+    def get_default(self, *args, **kwargs):
+        if 'name' in kwargs and 'default_theme' == kwargs['name']:
+            if 'default_theme' in cache:
+                query = cache.get('default_theme')
+            else:
+                query = self.get(*args, **kwargs)
+                cache.set('deafult_theme', query)
+        else:
+            query = self.get(*args, **kwargs)
+        return query
+                
+class WPTheme(models.Model):
+    theme_id = models.IntegerField(primary_key=True)
+    name = models.CharField(max_length=141)
+    primary_color = models.CharField(max_length=7)
+    secondary_color = models.CharField(max_length=7)
+    background_color = models.CharField(max_length=7)
+    button_color = models.CharField(max_length=7)
+
+    objects = WPThemeManager()
+
+    class Meta:
+        abstract = True
+    """
+    class WPApp(models.Model):
+    client_id = models.IntegerField()
+    client_secret = models.CharField(max_length=128)
+    state = models.CharField(max_length=32)
+    theme_object = models.ForeignKey(WPTheme)
+    #gaq_domains - Array
+    """
+class WPUser(models.Model):
+    user_id = models.IntegerField(primary_key=True)
+    owner = models.ForeignKey(User)
+    access_token = models.CharField(max_length=128)
+    user_name = models.CharField(max_length=61)
+    first_name = models.CharField(max_length=30)
+    last_name = models.CharField(max_length=30)
+    email = models.EmailField()
+    state = models.CharField(max_length=16, choices=USER_STATE_CHOICES)
+    expires = models.DateTimeField(null=True)
+
+
+class WPManager(models.Manager):
+
+    def create(self, *args, **kwargs):
+        fields = self.model._meta.get_all_field_names()
+        kwargs = dict([(x, kwargs[x]) for x in fields if x in kwargs])
+        kwargs = self.concat_fields(**kwargs)
+        return super(WPManager, self).create(*args, **kwargs)
+
+    def update(self, *args, **kwargs):
+        fields = self.model._meta.get_all_field_names()
+        kwargs = dict([(x, kwargs[x]) for x in fields if x in kwargs])
+        kwargs = self.concat_fields(**kwargs)
+        return super(WPManager, self).update(*args, **kwargs)
+
+    def concat_fields(self, **kwargs):
+        for key in kwargs:
+            field = self.model._meta.get_field(key)
+            if isinstance(field, models.CharField):
+                kwargs[key] = kwargs[key][:field.max_length]
+        return kwargs
+
+
+class WPBaseModel(models.Model):
+
+    objects = WPManager()
+
+    class Meta:
+        abstract = True
+
+
+class WPAccount(WPBaseModel):
+    account_id = models.IntegerField(primary_key=True)
+    wp_user = models.ForeignKey(WPUser)
+    name = models.CharField(max_length=128)
+    description = models.TextField()
+    reference_id = models.CharField(max_length=128, blank=True)
+    account_uri = models.URLField(blank=True)
+    payment_limit = MoneyField(null=True)
+    verification_state = models.CharField(
+        max_length=11, choices=ACCOUNT_STATUS_CHOICES, blank=True)
+    type = models.CharField(
+        max_length=11, choices = ACCOUNT_TYPE_CHOICES, blank=True)
+    balance = MoneyField(default=0)
+
+
+class WPAccountManager(models.Manager):
+    def _concat(self, kwargs):
+        if 'name' in kwargs:
+            kwargs['name'] = kwargs['name'][:128]
+        if 'reference_id' in kwargs:
+            kwargs['reference_id'] = kwargs['reference_id'][:128]
+        return kwargs
+
+    def create(self, *args, **kwargs):
+        fields = ['account_id', 'wp_user', 'name', 'description', 'reference_id', 
+                  'account_uri', 'payment_limit', 'theme',
+                  'verification_state', 'type']
+        kwargs = self._concat(dict([(x, kwargs[x]) for x in fields if x in kwargs]))
+        return super(WPAccountManager, self).create(*args, **kwargs)
+
+    def update(self, *args, **kwargs):
+        if 'theme_object' in kwargs and not 'theme' in kwargs:
+            theme_object = kwargs['theme_object']
+            try:
+                theme = WPTheme.objects.get(theme_id=theme_object['theme_id'])
+            except WPTheme.DoesNotExist:
+                theme = WPTheme.objects.create(**theme_object)
+        kwargs['theme'] = theme
+        fields = ['name', 'description', 'reference_id', 'theme',
+                  'payment_limit', 'verification_state', 'type']
+        kwargs = self._concat(dict([(x, kwargs[x]) for x in fields if x in kwargs]))
+        return super(WPAccountManager, self).update(*args, **kwargs)
+      
+
+class WPAccountBak(models.Model):
+    account_id = models.IntegerField(primary_key=True)
+    wp_user = models.ForeignKey(WPUser)
+    name = models.CharField(max_length=128)
+    description = models.TextField()
+    reference_id = models.CharField(max_length=128, blank=True)
+    account_uri = models.URLField(blank=True)
+    payment_limit = MoneyField(null=True)
+    #theme = models.ForeignKey(WPTheme)
+    #gaq_domains - Array
+    verification_state = models.CharField(
+        max_length=11, choices=ACCOUNT_STATUS_CHOICES, blank=True)
+    type = models.CharField(
+        max_length=11, choices = ACCOUNT_TYPE_CHOICES, blank=True)
+    balance = MoneyField(default=0)
+                  
+    objects = WPAccountManager()
+    
+    class Meta:
+        abstract = True
+    
+FEE_PAYER_CHOICES = (
+    ('payer', u"Payer"),
+    ('payee', u"Payee"),
+)
+
+PREAPPROVAL_STATE_CHOICES = (
+    ('new', u"New"),
+    ('approved', u"Approved"),
+    ('revoked', u"Revoked"),
+    ('expired', u"Expired"),
+    ('canceled', u"Canceled"),
+)
+
+PERIOD_CHOICES = (
+    ('hourly', u'Hourly'), 
+    ('daily', u'Daily'), 
+    ('weekly', u'Weekly'), 
+    ('biweekly', u'Biweekly'), 
+    ('monthly', u'Monthly'), 
+    ('bimonthly', u'Bimonthly'), 
+    ('quarterly', u'Quarterly'), 
+    ('yearly', u'Yearly'), 
+    ('once', u'Once'),
+)
+PREAPPROVAL_MODE_CHOICES = (
+    ('regular', u"Regular"),
+    ('iframe', u"IFrame"),
+)
+class WPPreapproval(models.Model):
+    preapproval_id = models.IntegerField(primary_key=True)
+    account_id = models.ForeignKey(WPAccount)
+    preapproval_uri = URLField()
+    manage_uri = URLField()
+    short_description = models.CharField(max_length=128)
+    long_description = models.TextField()
+    amount = MoneyField()
+    fee_payer = models.CharField(max_length=5, default='payer', 
+                                 choices=FEE_PAYER_CHOICES)
+    state = models.CharField(max_length=8, choices=PREAPPROVAL_STATE_CHOICES)
+    app_fee = MoneyField()
+    period = models.CharField(max_length=9, choices=PERIOD_CHOICES)
+    frequency = models.SmallIntegerField(default=1)
+    start_time = models.DateTimeField(auto_now_add=True)
+    end_time = models.DateTimeField()
+    auto_recur = models.BooleanField(default=False)
+    mode = models.CharField(max_length=7, choices=PREAPPROVAL_MODE_CHOICES)
+    funding_sources = models.CharField(max_length=8)
+    
+    class Meta:
+        abstract = True
+
+
+class WPCheckout(models.Model):
+    checkout_id = models.IntegerField(primary_key=True)
+    account = models.ForeignKey(WPAccount)
+    state = models.CharField(max_length=16, choices=CHECKOUT_STATE_CHOICES)
+    short_description = models.CharField(max_length=127)
+    long_description = models.CharField(max_length=2047)
+    currency = models.CharField(max_length=3, choices=CURRENCY_CHOICES)
+    amount = MoneyField()
+    fee = MoneyField()
+    gross = MoneyField()
+    app_fee = MoneyField()
+    fee_payer = models.CharField(max_length=5, choices=FEE_PAYER_CHOICES)
+    reference_id = models.CharField(max_length=128)
+    redirect_uri = URLField()
+    callback_uri = URLField()
+    payer_email = models.EmailField()
+    payer_name = models.CharField(max_length=61)
+    cancel_reason = models.TextField()
+    refund_reason = models.TextField()
+    auto_capture = models.BooleanField(default=True)
+    require_shipping = models.BooleanField(default=False)
+    shipping_address = models.ForeignKey(Address)
+    tax = MoneyField()
+    amount_refunded = MoneyField()
+    create_time = models.BigIntegerField()
+    # datetime field - expires after 30 min of inactivity
+    class Meta:
+        abstract = True
