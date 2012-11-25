@@ -50,13 +50,13 @@ Settings
 
 **Optional:**
 
-* ``WEPAY_PRODUCTION`` - Chooses url to use for API calls (https://www.wepay.com if ``True`` and https://stage.wepay.com if ``False``, which is decided by Python WePay SDK). Default is ``False``. Set ``True`` for using in production enviroment.
-* ``SITE_FULL_URL`` - Full url of the site with protocol ex. https://www.example.com If it is not set make sure you have ``django.contrib.sites`` in ``INSTALED_APPS`` since it will be used to decide on the url.
+* ``WEPAY_PRODUCTION`` - Chooses url to use for API calls (https://www.wepay.com if ``True`` and https://stage.wepay.com if ``False``, which is decided by Python WePay SDK). Default is ``False``. Set to ``True`` if using in production enviroment.
+* ``SITE_FULL_URL`` - Full url of the site with protocol ex. https://www.example.com If it is not set make sure you have ``django.contrib.sites`` in it to ``INSTALED_APPS`` since it will be used to decide on the url.
 * ``FORCE_SCRIPT_NAME`` - `Django setting <https://docs.djangoproject.com/en/1.4/ref/settings/#force-script-name>`_ in case your app is not at root of the domain. ex: If address for your site: https://www.example.com/myapp/ set ``FORCE_SCRIPT_NAME = 'myapp/'``
 * ``WEPAY_DEFAULT_SCOPE`` - default `permissions <https://www.wepay.com/developer/reference/permissions>`_ for your WePay application. Default is full access, which is ``"manage_accounts,collect_payments,view_balance,view_user,refund_payments,preapprove_payments,send_money"``
 * ``WEPAY_RETAIN_RECORDS`` - default is ``True``. Whenever account is deleted or user revokes the access and setting is set to ``True``, all records associated with user or account respectively will be marked as deleted in the database instead of being permanently removed, which is the case when setting is set to ``False``.
 * ``WEPAY_IPN_LIMIT`` - default is ``(20, 10)``. A tuple limiting the number of `IPN <https://www.wepay.com/developer/reference/ipn>`_ calls can be made (default is 20 IPNs within 10 second). If limit is exceded error will be send to WePay, which will cause WePay to retry the call at a later time. The functionality is to protect from malicios attempts to take advantage of `WePay throttling protection <https://www.wepay.com/developer/reference/throttling>`_ to prevent other API calls.
-* ``WEPAY_OBJECTS_DEFAULTS`` - default settings for all objects. You can supply only the values for field that are marked in WePay API as optional. Default is empty. Here is an example:
+* ``WEPAY_OBJECTS_DEFAULTS`` - default settings for all objects. You can supply only the values for field that are marked in WePay API as optional. Default is empty. Here is an example::
 
     WEPAY_OBJECTS_DEFAULTS = {
         'theme_object': {
@@ -92,6 +92,7 @@ Settings
     }
 
 * ``WEPAY_FULL_MODELS`` - list of the models you want to store all fileds possible for an object. Choices are the name of the models instead of the object names. Possible choices: ['WPUser', 'WPAccount', 'WPCheckout', 'WPPreapproval', 'WPWithdrawal'] Otherwords if you decide to put the name of the model in this list, all of the fields for associated object listed in WePay API will be stored locally in the databse. Default is empty, so only the necessary fields are stored locally. It was my objective decision to choose which are actually necessary, so if you decide differently, please let me know.
+* ``WEPAY_EXTRA_MODELS_MODULE`` - the module containing abstract models with fields to be added to the models.
 * ``WEPAY_EXTRA_MODELS`` - abstract models that contain extra fields you want to attach to an object. It should be in the form of tuple of tuples or list of tuples in form of string representation of an actual model of an object and string name of abstract model with extra fields. All abstract models with extra fields should be in the same module, which is specified using ``WEPAY_EXTRA_MODELS_MODULE``. Example setting is::
 
     WEPAY_EXTRA_MODELS = (
@@ -142,5 +143,3 @@ Extra models example if you are using django.contrib.auth and custom ordering by
         class Meta:
             abstract = True
             ordering = ['-create_time',]
-
-* ``WEPAY_EXTRA_MODELS_MODULE`` - the module containing abstract models with fields to be added to the models
