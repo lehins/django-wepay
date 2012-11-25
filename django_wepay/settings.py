@@ -11,8 +11,7 @@ WEPAY_RETAIN_RECORDS = getattr(settings, 'WEPAY_RETAIN_RECORDS', True)
 
 WEPAY_IPN_LIMIT = getattr(settings, 'WEPAY_IPN_LIMIT', (20, 10))
 
-# Make sure to use trailing slash.
-# Example https://example.com/ 
+# Example https://example.com
 SITE_FULL_URL = getattr(settings, 'SITE_FULL_URL', None)
 
 FORCE_SCRIPT_NAME = getattr(settings, 'FORCE_SCRIPT_NAME', '')
