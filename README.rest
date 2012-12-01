@@ -2,7 +2,7 @@
 django-wepay
 ######################################################################
 
-**Django SDK for `WePay <http://www.wepay.com>`_**
+**Django SDK for WePay http://www.wepay.com**
 
 Status
 ------
@@ -12,7 +12,7 @@ Currently SDK is functional, but still in a development mode. Fairly soon it wil
 About
 -----
 
-If you start using WePay API you realize that there is a bunch of staff needs to be stored locally, so that was an actual motivation for creation of this app. There is functionality for storing information for all objects in the database. For each object you can choose to store only minimal fields, all fields and/or add custom fields required for your app. It also handles `IPN (instant payment notifications) <https://www.wepay.com/developer/tutorial/ipn>`_ for all supported objects. Currently all but ``/app`` and ``/credit_card`` API calls are fully supported.
+If you start using WePay API you realize that there is a bunch of staff needs to be stored locally, so that was an actual motivation for creation of this app. There is functionality for storing information for all objects in the database locally. For each object you can choose to store only minimal fields, all fields and/or add custom fields required for your app. It also handles `IPN (instant payment notifications) <https://www.wepay.com/developer/tutorial/ipn>`_ for all supported objects. Currently all but ``/app`` and ``/credit_card`` API calls are fully supported.
 
 Requirements
 ------------
@@ -50,7 +50,7 @@ Settings
 
 **Optional:**
 
-* ``WEPAY_PRODUCTION`` - Chooses url to use for API calls (https://www.wepay.com if ``True`` and https://stage.wepay.com if ``False``, which is decided by Python WePay SDK). Default is ``False``. Set to ``True`` if using in production enviroment.
+* ``WEPAY_PRODUCTION`` - Chooses url to use for API calls (https://www.wepay.com if ``True`` and https://stage.wepay.com if ``False``, which is decided by Python WePay SDK). Default is ``False``. Set it to ``True`` if using in production enviroment.
 * ``SITE_FULL_URL`` - Full url of the site with protocol ex. https://www.example.com If it is not set make sure you have ``django.contrib.sites`` in it to ``INSTALED_APPS`` since it will be used to decide on the url.
 * ``FORCE_SCRIPT_NAME`` - `Django setting <https://docs.djangoproject.com/en/1.4/ref/settings/#force-script-name>`_ in case your app is not at root of the domain. ex: If address for your site: https://www.example.com/myapp/ set ``FORCE_SCRIPT_NAME = 'myapp/'``
 * ``WEPAY_DEFAULT_SCOPE`` - default `permissions <https://www.wepay.com/developer/reference/permissions>`_ for your WePay application. Default is full access, which is ``"manage_accounts,collect_payments,view_balance,view_user,refund_payments,preapprove_payments,send_money"``
@@ -92,7 +92,7 @@ Settings
     }
 
 * ``WEPAY_FULL_MODELS`` - list of the models you want to store all fileds possible for an object. Choices are the name of the models instead of the object names. Possible choices: ['WPUser', 'WPAccount', 'WPCheckout', 'WPPreapproval', 'WPWithdrawal'] Otherwords if you decide to put the name of the model in this list, all of the fields for associated object listed in WePay API will be stored locally in the databse. Default is empty, so only the necessary fields are stored locally. It was my objective decision to choose which are actually necessary, so if you decide differently, please let me know.
-* ``WEPAY_EXTRA_MODELS_MODULE`` - the module containing abstract models with fields to be added to the models.
+* ``WEPAY_EXTRA_MODELS_MODULE`` - the module containing abstract models with extra fields to be added to the models. If you run into circular import issues consider extending the ``DjangoWePay`` class (refer to the doc for that).
 * ``WEPAY_EXTRA_MODELS`` - abstract models that contain extra fields you want to attach to an object. It should be in the form of tuple of tuples or list of tuples in form of string representation of an actual model of an object and string name of abstract model with extra fields. All abstract models with extra fields should be in the same module, which is specified using ``WEPAY_EXTRA_MODELS_MODULE``. Example setting is::
 
     WEPAY_EXTRA_MODELS = (

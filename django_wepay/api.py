@@ -189,9 +189,9 @@ class DjangoWePay(WePay):
         """
         if not callback_uri:
             callback_uri = reverse('wepay_ipn_user')
-        callback_uri = self._format_uri(callback_uri)
         oauth2_token_response = self.get_token(
             redirect_uri, code, callback_uri=callback_uri)
+        callback_uri = self._format_uri(callback_uri)
         user_id = oauth2_token_response['user_id']
         self.access_token = oauth2_token_response['access_token']
         user_response = self.user_get()
