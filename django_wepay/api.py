@@ -272,7 +272,8 @@ class DjangoWePay(WePay):
         :param str name	The name of the account you want to create.
         :param str description The description of the account you want to create.
         """
-        params = self.defaults.get('account', {})
+        params = {}
+        params.update(self.defaults.get('account', {}))
         params.update({
                 'name': name,
                 'description': description,
@@ -417,7 +418,8 @@ class DjangoWePay(WePay):
         """
         if isinstance(account, int):
             account = self.mWPAccount.objects.get(pk=account)
-        params = self.defaults.get('preapproval', {})
+        params = {}
+        params.update(self.defaults.get('preapproval', {}))
         params.update({
                 'account_id': account.pk,
                 'short_description': short_description,
@@ -499,7 +501,8 @@ class DjangoWePay(WePay):
         else:
             account_id = account
             account = self.mWPAccount.objects.get(pk=account_id)
-        params = self.defaults.get('checkout', {})
+        params = {}
+        params.update(self.defaults.get('checkout', {}))
         params.update({
                 'account_id': account_id,
                 'short_description': short_description,
@@ -628,7 +631,8 @@ class DjangoWePay(WePay):
         return self.call("/withdrawal/find", params=params)
 
     def withdrawal_create(self, account, **kwargs):
-        params = self.defaults.get('withdrawal', {})
+        params = {}
+        params.update(self.defaults.get('withdrawal', {}))
         if isinstance(account, self.mWPAccount):
             account_id = account.pk
         else:
