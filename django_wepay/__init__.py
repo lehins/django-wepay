@@ -2,4 +2,9 @@ from django_wepay.api import DjangoWePay
 
 # Major, minor, revision
 
-VERSION = (0, 0, 1)
+VERSION = (1, 0, 0)
+
+def get_version():
+    return "%s.%s.%s" % VERSION
+
+__version__ = get_version()
