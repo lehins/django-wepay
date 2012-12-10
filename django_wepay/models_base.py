@@ -1,7 +1,12 @@
 import django
 from django.db import models
-from django.contrib.localflavor.us.models import USStateField
 from django.core.cache import cache
+
+try:
+    from django_localflavor_us.models import USStateField
+except ImportError:
+    from django.contrib.localflavor.us.models import USStateField
+
 
 from django_wepay import forms, settings
 

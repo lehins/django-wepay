@@ -33,7 +33,7 @@ class DjangoWePayTestCase(TestCase):
 
     @classmethod
     def setUpClass(self):
-        Site.objects.create(id=2, domain="lehins.dyndns.org", name="test site")
+        Site.objects.create(id=2, domain="test.example.com", name="test site")
         self.dwepay = DjangoWePay()
         self.testcc = "4003830171874018"
         browser = browser_create()
@@ -41,8 +41,8 @@ class DjangoWePayTestCase(TestCase):
         auth_url = self.dwepay.get_authorization_url(self.test_uri)
         browser.open(auth_url)
         browser.select_form(nr=0)
-        self.email = "test.dude@yandex.ru"
-        self.pwd = "DjangoW3Pay"
+        self.email = ""
+        self.pwd = ""
         browser.form['email'] = self.email
         browser.form['password'] = self.pwd
         browser.submit()

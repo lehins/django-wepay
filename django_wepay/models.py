@@ -186,8 +186,8 @@ class WPCheckout(WPBaseModel, WPCheckoutFull, WPCheckoutExtra):
     account = models.ForeignKey(WPAccount)
     state = models.CharField(max_length=16, choices=CHECKOUT_STATE_CHOICES)
     amount = MoneyField()
-    fee = MoneyField()
-    gross = MoneyField()
+    fee = MoneyField(null=True)
+    gross = MoneyField(null=True)
     app_fee = MoneyField()
     fee_payer = models.CharField(max_length=5, choices=FEE_PAYER_CHOICES)
     payer_email = models.EmailField()
@@ -199,7 +199,7 @@ class WPCheckout(WPBaseModel, WPCheckoutFull, WPCheckoutExtra):
     shipping_address = models.ForeignKey(WPAddress, null=True)
     amount_refunded = MoneyField(null=True)
     create_time = models.IntegerField()
-    preapproval = models.OneToOneField(WPPreapproval, null=True)
+    preapproval = models.ForeignKey(WPPreapproval, null=True)
 
     class Meta(WPCheckoutExtra.Meta):
         db_table = "django_wepay_checkout"
