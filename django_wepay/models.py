@@ -103,13 +103,13 @@ class WPBaseModel(models.Model):
 # Concrete Models Below
 
 class WPAddress(WPBaseModel, WPAddressExtra):
-    address1 = models.CharField(max_length=64)
-    address2 = models.CharField(max_length=64, blank=True)
-    city = models.CharField(max_length=64)
+    address1 = models.CharField(max_length=63)
+    address2 = models.CharField(max_length=63, blank=True)
+    city = models.CharField(max_length=63)
     state = USStateField()
     zip = models.CharField(max_length=10)
-    country = models.CharField(max_length=32)
-    name = models.CharField(max_length=128, blank=True)
+    country = models.CharField(max_length=63)
+    name = models.CharField(max_length=127, blank=True)
     
     class Meta(WPAddressExtra.Meta):
         db_table = "django_wepay_address"
@@ -117,10 +117,10 @@ class WPAddress(WPBaseModel, WPAddressExtra):
 
 class WPUser(WPBaseModel, WPUserFull, WPUserExtra):
     user_id = models.IntegerField(primary_key=True)
-    access_token = models.CharField(max_length=128)
+    access_token = models.CharField(max_length=127)
     user_name = models.CharField(max_length=61)
     email = models.EmailField()
-    state = models.CharField(max_length=16, choices=USER_STATE_CHOICES)
+    state = models.CharField(max_length=15, choices=USER_STATE_CHOICES)
     expires = models.IntegerField(null=True)
     
     def delete(self, *args, **kwargs):
@@ -134,14 +134,14 @@ class WPUser(WPBaseModel, WPUserFull, WPUserExtra):
 
 class WPAccount(WPBaseModel, WPAccountFull, WPAccountExtra):
     account_id = models.IntegerField(primary_key=True)
-    name = models.CharField(max_length=128)
+    name = models.CharField(max_length=127)
     description = models.CharField(max_length=2047)
     account_uri = models.URLField()
     payment_limit = MoneyField(null=True)
     verification_state = models.CharField(
-        max_length=11, choices=ACCOUNT_STATE_CHOICES)
+        max_length=15, choices=ACCOUNT_STATE_CHOICES)
     type = models.CharField(
-        max_length=11, choices = ACCOUNT_TYPE_CHOICES)
+        max_length=15, choices = ACCOUNT_TYPE_CHOICES)
     pending_balance = MoneyField(default=0)
     available_balance = MoneyField(default=0)
     user = models.ForeignKey(WPUser)
@@ -166,9 +166,9 @@ class WPPreapproval(WPBaseModel, WPPreapprovalFull, WPPreapprovalExtra):
     amount = MoneyField()
     fee_payer = models.CharField(
         max_length=5, default='payer', choices=FEE_PAYER_CHOICES)
-    state = models.CharField(max_length=8, choices=PREAPPROVAL_STATE_CHOICES)
+    state = models.CharField(max_length=15, choices=PREAPPROVAL_STATE_CHOICES)
     app_fee = MoneyField()
-    period = models.CharField(max_length=9, choices=PREAPPROVAL_PERIOD_CHOICES)
+    period = models.CharField(max_length=15, choices=PREAPPROVAL_PERIOD_CHOICES)
     start_time = models.IntegerField()
     end_time = models.IntegerField()
     payer_email = models.EmailField()
@@ -184,12 +184,12 @@ class WPPreapproval(WPBaseModel, WPPreapprovalFull, WPPreapprovalExtra):
 class WPCheckout(WPBaseModel, WPCheckoutFull, WPCheckoutExtra):
     checkout_id = models.IntegerField(primary_key=True)
     account = models.ForeignKey(WPAccount)
-    state = models.CharField(max_length=16, choices=CHECKOUT_STATE_CHOICES)
+    state = models.CharField(max_length=15, choices=CHECKOUT_STATE_CHOICES)
     amount = MoneyField()
     fee = MoneyField(null=True)
     gross = MoneyField(null=True)
     app_fee = MoneyField()
-    fee_payer = models.CharField(max_length=5, choices=FEE_PAYER_CHOICES)
+    fee_payer = models.CharField(max_length=15, choices=FEE_PAYER_CHOICES)
     payer_email = models.EmailField()
     payer_name = models.CharField(max_length=61)
     cancel_reason = models.TextField(blank=True)
@@ -208,7 +208,7 @@ class WPCheckout(WPBaseModel, WPCheckoutFull, WPCheckoutExtra):
 class WPWithdrawal(WPBaseModel, WPWithdrawalFull, WPWithdrawalExtra):
     withdrawal_id = models.IntegerField(primary_key=True)
     account = models.ForeignKey(WPAccount)
-    state = models.CharField(max_length=16, choices=WITHDRAWAL_STATE_CHOICES)
+    state = models.CharField(max_length=15, choices=WITHDRAWAL_STATE_CHOICES)
     withdrawal_uri = URLField()
     amount = MoneyField(null=True)
     note = models.CharField(max_length=255)
