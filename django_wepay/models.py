@@ -41,10 +41,18 @@ class WPQuerySet(models.query.QuerySet):
         return super(WPQuerySet, self).update(**kwargs)
 
     def concat_fields(self, **kwargs):
+        """
+        Makes sure all CharField will not receive None or a string longer then 
+        max_length set for the field.
+        """
         for key in kwargs:
+            val = kwargs.get(key)
             field = self.model._meta.get_field(key)
             if isinstance(field, models.CharField):
-                kwargs[key] = kwargs[key][:field.max_length]
+                if val is None:
+                    val = ''
+                else:
+                    kwargs.update({key: val[:field.max_length]})
         return kwargs
 
     def filter(self, *args, **kwargs):
@@ -85,7 +93,10 @@ class WPBaseModel(models.Model):
                 val = kwargs[f]
                 field = self.__class__._meta.get_field(f)
                 if isinstance(field, models.CharField):
-                    val = val[:field.max_length]
+                    if val is None:
+                        val = ''
+                    else:
+                        val = val[:field.max_length]
                 elif f == 'shipping_address':
                     if self.shipping_address:
                         val = self.shipping_address.update(**val)
@@ -135,7 +146,7 @@ class WPUser(WPBaseModel, WPUserFull, WPUserExtra):
 class WPAccount(WPBaseModel, WPAccountFull, WPAccountExtra):
     account_id = models.IntegerField(primary_key=True)
     name = models.CharField(max_length=127)
-    description = models.CharField(max_length=2047)
+    description = models.CharField(max_length=2047, blank=True)
     account_uri = models.URLField()
     payment_limit = MoneyField(null=True)
     verification_state = models.CharField(

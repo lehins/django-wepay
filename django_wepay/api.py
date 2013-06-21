@@ -385,7 +385,7 @@ class DjangoWePay(WePay):
         else:
             account_id = account
         response = self.account_balance(account_id)
-        return self.account_update_local(account, response)
+        return self.account_update_local(account, response=response)
 
 
     def preapproval_get(self, preapproval):
