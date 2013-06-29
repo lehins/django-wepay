@@ -121,6 +121,9 @@ class WPAddress(WPBaseModel, WPAddressExtra):
     zip = models.CharField(max_length=10)
     country = models.CharField(max_length=63)
     name = models.CharField(max_length=127, blank=True)
+
+    def __str__(self):
+        return self.name
     
     class Meta(WPAddressExtra.Meta):
         db_table = "django_wepay_address"
@@ -134,6 +137,9 @@ class WPUser(WPBaseModel, WPUserFull, WPUserExtra):
     state = models.CharField(max_length=15, choices=USER_STATE_CHOICES)
     expires = models.IntegerField(null=True)
     
+    def __str__(self):
+        return self.username
+
     def delete(self, *args, **kwargs):
         for account in self.wpaccount_set.all():
             account.delete(db_delete=kwargs.get('db_delete'))
@@ -157,6 +163,9 @@ class WPAccount(WPBaseModel, WPAccountFull, WPAccountExtra):
     available_balance = MoneyField(default=0)
     user = models.ForeignKey(WPUser)
     verification_uri = models.URLField(blank=True)
+
+    def __str__(self):
+        return self.name
 
     def delete(self, *args, **kwargs):
         for preapproval in self.wppreapproval_set.all():
@@ -188,6 +197,9 @@ class WPPreapproval(WPBaseModel, WPPreapprovalFull, WPPreapprovalExtra):
     shipping_address = models.ForeignKey(WPAddress, null=True)
     create_time = models.IntegerField()
 
+    def __str__(self):
+        return self.pk
+
     class Meta(WPPreapprovalExtra.Meta):
         db_table = "django_wepay_preapproval"
 
@@ -212,6 +224,9 @@ class WPCheckout(WPBaseModel, WPCheckoutFull, WPCheckoutExtra):
     create_time = models.IntegerField()
     preapproval = models.ForeignKey(WPPreapproval, null=True)
 
+    def __str__(self):
+        return self.pk
+
     class Meta(WPCheckoutExtra.Meta):
         db_table = "django_wepay_checkout"
 
@@ -225,6 +240,9 @@ class WPWithdrawal(WPBaseModel, WPWithdrawalFull, WPWithdrawalExtra):
     note = models.CharField(max_length=255)
     recipient_confirmed = models.BooleanField(default=True)
     create_time = models.IntegerField()
+
+    def __str__(self):
+        return self.pk
 
     class Meta(WPWithdrawalExtra.Meta):
         db_table = "django_wepay_withdrawal"
