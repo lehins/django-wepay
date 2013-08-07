@@ -181,7 +181,7 @@ class DjangoWePay(WePay):
         """
         API doc: https://www.wepay.com/developer/reference/oauth2#authorize
         Creates the user on WePay and locally. If user already in the db as deleted 
-        revives him, but none of the other objects associated with user.
+        revives him, and all of the other objects associated with user.
         :param str code The code returned by /v2/oauth2/authorize
         :param str redirect_uri The uri the user will be redirected to after 
         authorization. Must be the same as passed in /v2/oauth2/authorize (get_token)
@@ -664,7 +664,7 @@ class DjangoWePay(WePay):
         return self.call("/withdrawal/modify", params=params)
 
     def withdrawal_update_local(self, withdrawal, response=None):
-        if isinstance(account, self.mWPWithdrawal):
+        if isinstance(withdrawal, self.mWPWithdrawal):
             withdrawal_id = withdrawal.pk
         else:
             withdrawal_id = withdrawal
@@ -678,10 +678,8 @@ class DjangoWePay(WePay):
         if withdrawal.state != response['state']:
             previous_state = withdrawal.state
             withdrawal.update(**response)
-            withdrawal_state_changed(
+            withdrawal_state_changed.send(
                 sender=self.mWPWithdrawal, withdrawal=withdrawal,
                 previous_state=previous_state, response=response)
             return withdrawal
         return withdrawal.update(**response)
-        
-

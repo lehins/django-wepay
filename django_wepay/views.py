@@ -27,8 +27,8 @@ def ipn_user(request):
                 user_deleted.send(sender=WPUser, instance=user)
                 user.delete()
                 return HttpResponse("Removal successfull.")
-            return HttpResponse("Something went wrong.", code=500)
-    raise HttpResponse("Not recognized or not implemented object IPN.", code=501)
+            return HttpResponse("Something went wrong.", status=500)
+    return HttpResponse("Not recognized or not implemented object IPN.", status=501)
 
 @csrf_exempt
 def ipn_account(request):
@@ -44,7 +44,7 @@ def ipn_account(request):
             if e.type == 'access_denied':
                 account.delete()
         return HttpResponse("Updated successfully.")
-    raise HttpResponse("Not recognized or not implemented object IPN.", code=501)
+    return HttpResponse("Not recognized or not implemented object IPN.", status=501)
 
 @csrf_exempt
 def ipn_checkout(request):
@@ -56,7 +56,7 @@ def ipn_checkout(request):
         d_wepay = DjangoWePay(account=checkout.account)
         d_wepay.checkout_update_local(checkout)
         return HttpResponse("Updated successfully.")
-    raise HttpResponse("Not recognized or not implemented object IPN.", code=501)
+    return HttpResponse("Not recognized or not implemented object IPN.", status=501)
 
 
 @csrf_exempt
@@ -71,7 +71,7 @@ def ipn_preapproval(request):
         d_wepay = DjangoWePay(account=preapproval.account)
         d_wepay.preapproval_update_local(preapproval)
         return HttpResponse("Updated successfully.")
-    raise HttpResponse("Not recognized or not implemented object IPN.", code=501)
+    return HttpResponse("Not recognized or not implemented object IPN.", status=501)
 
 
 @csrf_exempt
@@ -85,7 +85,7 @@ def ipn_withdrawal(request):
         d_wepay = DjangoWePay(account=withdrawal.account)
         d_wepay.withdrawal_update_local(withdrawal)
         return HttpResponse("Updated successfully.")
-    raise HttpResponse("Not recognized or not implemented object IPN.", code=501)
+    return HttpResponse("Not recognized or not implemented object IPN.", status=501)
 
 def testing_callback(request):
     return HttpResponse("Success")

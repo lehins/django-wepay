@@ -24,7 +24,7 @@ class WPQuerySet(models.query.QuerySet):
         shipping_address = kwargs.pop('shipping_address', None)
         obj = self.model(**kwargs)
         self._for_write = True
-        obj.save(force_insert=False, using=self.db)
+        obj.save()
         if shipping_address:
             if obj.shipping_address:
                 obj.shipping_address.update(**shipping_address)
@@ -138,7 +138,7 @@ class WPUser(WPBaseModel, WPUserFull, WPUserExtra):
     expires = models.IntegerField(null=True)
     
     def __str__(self):
-        return self.username
+        return self.user_name
 
     def delete(self, *args, **kwargs):
         for account in self.wpaccount_set.all():
