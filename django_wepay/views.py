@@ -27,7 +27,7 @@ def ipn_user(request):
                 user_deleted.send(sender=WPUser, instance=user)
                 user.delete()
                 return HttpResponse("Removal successfull.")
-            return HttpResponse("Something went wrong.", status=500)
+            return HttpResponse("Something went wrong. %s" % e, status=500)
     return HttpResponse("Not recognized or not implemented object IPN.", status=501)
 
 @csrf_exempt
