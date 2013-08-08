@@ -1,12 +1,15 @@
 from django.test import TestCase
 from django.core.urlresolvers import reverse
 from django.contrib.sites.models import Site
-
+from django.conf import settings
 from django_wepay.api import DjangoWePay
 from wepay.exceptions import WePayError
 
 from decimal import Decimal
 import cookielib, mechanize, urllib, urllib2
+
+WEPAY_EMAIL = getattr(settings, 'WEPAY_TEST_LOGIN', '')
+WEPAY_PASSWORD = getattr(settings, 'WEPAY_TEST_PASSWORD', '')
 
 def browser_create():
     browser = mechanize.Browser()
@@ -20,9 +23,9 @@ def browser_create():
     browser.set_handle_refresh(
         mechanize._http.HTTPRefreshProcessor(), max_time=1)
     # debugging stuff
-    # browser.set_debug_redirects(True)
-    # browser.set_debug_responses(True)
-    # browser.set_debug_http(True)
+    #browser.set_debug_redirects(True)
+    #browser.set_debug_responses(True)
+    #browser.set_debug_http(True)
     browser.addheaders = [
         ('User-Agent' , 
          "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.4 (KHTML, like Gecko)"
@@ -32,50 +35,50 @@ def browser_create():
 class DjangoWePayTestCase(TestCase):
 
     @classmethod
-    def setUpClass(self):
-        Site.objects.create(id=2, domain="test.example.com", name="test site")
-        self.dwepay = DjangoWePay()
-        self.testcc = "4003830171874018"
+    def setUpClass(cls):
+        cls.dwepay = DjangoWePay()
+        cls.testcc = "4003830171874018"
         browser = browser_create()
-        self.test_uri = reverse('testing_callback')
-        auth_url = self.dwepay.get_authorization_url(self.test_uri)
+        cls.test_uri = reverse('testing_callback')
+        # requires initial data for sites.Site model
+        auth_url = cls.dwepay.get_authorization_url(cls.test_uri)
+        print auth_url
         browser.open(auth_url)
         browser.select_form(nr=0)
-        self.email = ""
-        self.pwd = ""
-        browser.form['email'] = self.email
-        browser.form['password'] = self.pwd
+        cls.email = WEPAY_EMAIL
+        browser.form['email'] = cls.email
+        browser.form['password'] = WEPAY_PASSWORD
+        browser.form.set_all_readonly(False)
+        browser.form['form'] = 'login'
         browser.submit()
         url = browser.response().geturl()
+        print url
         code = url.split('/')[-1].split('=')[-1]
-        self.user = self.dwepay.user_create(
-            code, self.test_uri, callback_uri=self.test_uri)
-        accounts = self.user.wpaccount_set.all()
-        print len(accounts)
-        print len(self.dwepay.mWPPreapproval.objects.all())
-        print len(self.dwepay.mWPCheckout.objects.all())
-        self.account = self.dwepay.account_create(
-            "name:Test Account", "descr:Test Account", callback_uri=self.test_uri)
-        self.user.save()
-        self.account.save()
+        cls.user = cls.dwepay.user_create(
+            code, cls.test_uri, callback_uri=cls.test_uri)
+        accounts = cls.user.wpaccount_set.all()
+        cls.account = cls.dwepay.account_create(
+            "name:Test Account", "descr:Test Account", callback_uri=cls.test_uri)
+        cls.user.save()
+        cls.account.save()
 
     @classmethod
-    def tearDownClass(self):
+    def tearDownClass(cls):
         # best attempt of cleanup after tests
-        accounts = self.user.wpaccount_set.all()
-        checkouts = self.dwepay.mWPCheckout.objects.all()
-        preapprovals = self.dwepay.mWPPreapproval.objects.all()
+        accounts = cls.user.wpaccount_set.all()
+        checkouts = cls.dwepay.mWPCheckout.objects.all()
+        preapprovals = cls.dwepay.mWPPreapproval.objects.all()
         for checkout in checkouts:
             try:
-                self.dwepay.checkout_refund(checkout, "Cleanup")
+                cls.dwepay.checkout_refund(checkout, "Cleanup")
             except WePayError: pass
         for account in accounts:
             try:
-                self.dwepay.account_delete(account)
+                cls.dwepay.account_delete(account)
             except WePayError: pass
         for preapproval in preapprovals:
             try:
-                self.dwepay.preapproval_cancel(preapproval)
+                cls.dwepay.preapproval_cancel(preapproval)
             except WePayError: pass
         
 
