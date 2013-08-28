@@ -18,16 +18,15 @@ USER_STATE_CHOICES = (
 )
 
 ACCOUNT_STATE_CHOICES = (
-    ('unverified', u"Unverified"),
-    ('pending', u"Pending"),
-    ('verified', u"Verified"),
+    ('active', "Active"),
+    ('disabled', "Disabled"),
+    ('deleted', "Deleted"),
 )
 
 ACCOUNT_TYPE_CHOICES = (
     ('personal', u"Personal"),
     ('nonprofit', u"Non-profit Organization"),
     ('business', u"Business"),
-    ('membership', u"Membership Organization"),
 )
 
 CHECKOUT_TYPE_CHOICES = (
@@ -66,6 +65,9 @@ PREAPPROVAL_STATE_CHOICES = (
     ('revoked', u"Revoked"),
     ('expired', u"Expired"),
     ('canceled', u"Canceled"),
+    ('stopped', u"Stopped"),
+    ('completed', u"Completed"),
+    ('retrying', u"Retrying"),
 )
 
 PREAPPROVAL_PERIOD_CHOICES = (
