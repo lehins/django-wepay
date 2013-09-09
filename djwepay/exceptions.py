@@ -1,11 +1,3 @@
-from wepay.exceptions import WePayError as WePayErrorAPI
+from wepay.exceptions import *
 
-__all__ = ["WePayError", "WePayWarning"]
-
-class WePayError(WePayErrorAPI):
-    def __init__(self, error_type, message, error_code):
-        WePayErrorAPI.__init__(self, error_type, message)
-        self.error_code = error_code
-
-class WePayWarning(Warning):
-    pass
+__all__ = ['WePayError', 'WePayWarning']

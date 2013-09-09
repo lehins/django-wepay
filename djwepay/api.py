@@ -1,196 +1,261 @@
+import time
 from django.conf import settings
+from django.contrib.sites.models import Site
+from django.core.cache import cache
 
-from djwepay import core
+from wepay import WePay as PythonWePay
+from djwepay.decorators import batchable, CACHE_BATCH_TIMEOUT
+from djwepay.utils import make_batch_key
 
-CLIENT_ID = getattr(settings, 'WEPAY_CLIENT_ID')
-CLIENT_SECRET = getattr(settings, 'WEPAY_CLIENT_SECRET')
 
-ACCESS_TOKEN = getattr(settings, 'WEPAY_ACCESS_TOKEN', None)
-PRODUCTION = getattr(settings , 'WEPAY_PRODUCTION', True)
+__all__ = ['WePay']
 
 # default is full access
 DEFAULT_SCOPE = getattr(
     settings, 'WEPAY_DEFAULT_SCOPE', "manage_accounts,collect_payments,"
     "view_balance,view_user,preapprove_payments,send_money")
 
-DEFAULT_CREATE = getattr(settings, 'WEPAY_OBJECTS_DEFAULT_CREATE', {})
+THROTTLE_PROTECT = getattr(settings, 'WEPAY_THROTTLE_PROTECT', False)
+THROTTLE_CALL_LIMIT = getattr(settings, 'WEPAY_THROTTLE_CALL_LIMIT', 30)
+THROTTLE_TIMEOUT = getattr(settings, 'WEPAY_THROTTLE_TIMEOUT', 10)
+THROTTLE_CALL_KEY = 'wepay-throttle-call'
+BLOCKING_KEY = THROTTLE_CALL_KEY + '-blocked'
 
-class ApiCall(core.Call):
-    def __init__(self, production=PRODUCTION, access_token=ACCESS_TOKEN,
-                 client_id=CLIENT_ID, client_secret=CLIENT_SECRET,
-                 local_object=None, **kwargs):
-        self.local_object = local_object
-        self._client_id = client_id
-        self._client_secret = client_secret
-        self._defaults = DEFAULT_CREATE
-        super(ApiCall, self).__init__(
-            production=production, access_token=access_token, **kwargs)
+class WePay(PythonWePay):
 
-class OAuth2Call(ApiCall, core.OAuth2):
-    def authorize(self, redirect_uri, **kwargs):
-        return super(OAuth2Call, self).authorize(
-            self._client_id, redirect_uri, DEFAULT_SCOPE, **kwargs)
+    def __init__(self, app):
+        self._app = app
+        self.site_uri = "https://%s" % str(Site.objects.get_current())
+        super(WePay, self).__init__(
+            production=self._app.production, access_token=self._app.access_token)
+
+    def call(self, *args, **kwargs):
+        if THROTTLE_PROTECT:
+            # TODO add a logger and a notifier
+            blocked = cache.add(BLOCKING_KEY, True)
+            if not blocked:
+                time.sleep(1)
+                return self.call(*args, **kwargs)
+            now = int(time.time())
+            unexpired_timestamp = now - THROTTLE_TIMEOUT
+            unexpired_calls = [x for x in cache.get(THROTTLE_CALL_KEY, [])
+                               if x >= unexpired_timestamp]
+            if len(unexpired_calls) >= THROTTLE_CALL_LIMIT:
+                cache.delete(BLOCKING_KEY)
+                sleep_time = THROTTLE_TIMEOUT + unexpired_calls[0] - now + 1
+                time.sleep(sleep_time)
+                return self.call(*args, **kwargs)
+            else:
+                unexpired_calls.append(now)
+                cache.set(
+                    THROTTLE_CALL_KEY, unexpired_calls, THROTTLE_TIMEOUT)
+                cache.delete(BLOCKING_KEY)
+                return super(WePay, self).call(*args, **kwargs)
+        else:
+            return super(WePay, self).call(*args, **kwargs)
+
+    def get_full_uri(self, uri):
+        """
+        Used to builed callback uri's. Make sure you have SITE_FULL_URL in 
+        settings or Site app enabled.
+        :param str last part of url
+        """
+        return '%s%s' % (self.site_uri, uri)
+
+    def get_login_uri(self):
+        """
+        Returns WePay login url. Better place for users then account uri, 
+        less confusing.
+        """
+        uri_list = self.browser_endpoint.split('/')[:-1]
+        uri_list.append('login')
+        return '/'.join(uri_list)
+
+   
+    def oauth2_authorize(self, redirect_uri, **kwargs):
+        return super(WePay, self).oauth2_authorize(
+            self._app.client_id, redirect_uri, DEFAULT_SCOPE, **kwargs)
+
+    @batchable
+    def oauth2_token(self, redirect_uri, code, **kwargs):
+        return super(WePay, self).oauth2_token(
+            self._app.client_id, redirect_uri, self._app.client_secret, code, 
+            **kwargs)
+
+
+    @batchable
+    def app(self, **kwargs):
+        return super(WePay, self).app(
+            self._app.client_id, self._app.client_secret, **kwargs)
+
+    @batchable
+    def app_modify(self, **kwargs):
+        return super(WePay, self).app_modify(
+            self._app.client_id, self._app.client_secret, **kwargs)
+
+
+    @batchable
+    def user(self, *args, **kwargs):
+        return super(WePay, self).user(*args, **kwargs)
+
+    @batchable
+    def user_modify(self, *args, **kwargs):
+        return super(WePay, self).user_modify(*args, **kwargs)
+
+
+    @batchable
+    def account(self, *args, **kwargs):
+        return super(WePay, self).account(*args, **kwargs)
+
+    @batchable
+    def account_find(self, *args, **kwargs):
+        return super(WePay, self).account_find(*args, **kwargs)
+
+    @batchable
+    def account_create(self, *args, **kwargs):
+        return super(WePay, self).account_create(*args, **kwargs)
+
+    @batchable
+    def account_modify(self, *args, **kwargs):
+        return super(WePay, self).account_modify(*args, **kwargs)
+
+    @batchable
+    def account_delete(self, *args, **kwargs):
+        return super(WePay, self).account_delete(*args, **kwargs)
+
+    @batchable
+    def account_balance(self, *args, **kwargs):
+        return super(WePay, self).account_balance(*args, **kwargs)
         
-    def token(self, redirect_uri, code, **kwargs):
-        return super(OAuth2Call, self).token(
-            self._client_id, redirect_uri, self._client_secret, code, **kwargs)
-
-class AppCall(ApiCall, core.App):
-    
-    def __call__(self, **kwargs):
-        return super(AppCall, self).__call__(
-            self._client_id, self._client_secret, **kwargs)
-
-
-    def modify(self, **kwargs):
-        return super(AppCall, self).modify(
-            self._client_id, self._client_secret, **kwargs)
-
-class UserCall(ApiCall, core.User, OAuth2Call):
-    def __call__(self, **kwargs):
-        return super(UserCall, self).__call__(**kwargs)
-
-    def create(self, *args, **kwargs):
-        return self.token(*args, **kwargs)
-
-class AccountCall(ApiCall, core.Account):
-    
-    def __call__(self, **kwargs):
-        return super(AccountCall, self).__call__(self.local_object.pk, **kwargs)
-
-    def create(self, *args, **kwargs):
-        kwargs_new = {}
-        if 'account' in self._defaults:
-            kwargs_new.update(self._defaults['account'])
-        kwargs_new.update(kwargs)
-        return super(AccountCall, self).create(*args, **kwargs_new)
-
-    def modify(self, **kwargs):
-        return super(AccountCall, self).modify(self.local_object.pk, **kwargs)
+    @batchable
+    def account_add_bank(self, *args, **kwargs):
+        return super(WePay, self).account_add_bank(*args, **kwargs)
         
-    def delete(self, **kwargs):
-        return super(AccountCall, self).delete(self.local_object.pk, **kwargs)
+    @batchable
+    def account_set_tax(self, *args, **kwargs):
+        return super(WePay, self).account_set_tax(*args, **kwargs)
 
-    def balance(self, **kwargs):
-        return super(AccountCall, self).balance(self.local_object.pk, **kwargs)
-        
-    def add_bank(self, **kwargs):
-        return super(AccountCall, self).add_bank(self.local_object.pk, **kwargs)
-
-    def set_tax(self, taxes, **kwargs):
-        return super(AccountCall, self).set_tax(self.local_object.pk, taxes, **kwargs)
-
-    def get_tax(self, **kwargs):
-        return super(AccountCall, self).get_tax(self.local_object.pk, **kwargs)
-
-class CheckoutCall(ApiCall, core.Checkout):
-
-    def __call__(self, **kwargs):
-        return super(CheckoutCall, self).__call__(self.local_object.pk, **kwargs)
-
-    def create(self, *args, **kwargs):
-        kwargs_new = {}
-        if 'checkout' in self._defaults:
-            kwargs_new.update(self._defaults['checkout'])
-        kwargs_new.update(kwargs)
-        return super(CheckoutCall, self).create(*args, **kwargs_new)
-
-    def cancel(self, cancel_reason, **kwargs):
-        return super(CheckoutCall, self).cancel(
-            self.local_object.pk, cancel_reason, **kwargs)
-
-    def refund(self, refund_reason, **kwargs):
-        return super(CheckoutCall, self).refund(
-            self.local_object.pk, refund_reason, **kwargs)
-
-    def capture(self, **kwargs):
-        return super(CheckoutCall, self).capture(self.local_object.pk, **kwargs)
-
-    def modify(self, **kwargs):
-        return super(CheckoutCall, self).modify(self.local_object.pk, **kwargs)
+    @batchable
+    def account_get_tax(self, *args, **kwargs):
+        return super(WePay, self).account_get_tax(*args, **kwargs)
 
 
-class PreapprovalCall(ApiCall, core.Preapproval):
-    def __call__(self, **kwargs):
-        return super(PreapprovalCall, self).__call__(self.local_object.pk, **kwargs)
+    @batchable
+    def checkout(self, *args, **kwargs):
+        return super(WePay, self).checkout(*args, **kwargs)
 
-    def create(self, *args, **kwargs):
-        kwargs_new = {}
-        if 'preapproval' in self._defaults:
-            kwargs_new.update(self._defaults['preapproval'])
-        kwargs_new.update(kwargs)
-        return super(PreapprovalCall, self).create(*args, **kwargs_new)
+    @batchable
+    def checkout_find(self, *args, **kwargs):
+        return super(WePay, self).checkout_find(*args, **kwargs)
 
-    def cancel(self, **kwargs):
-        return super(PreapprovalCall, self).cancel(self.local_object.pk, **kwargs)
+    @batchable
+    def checkout_create(self, *args, **kwargs):
+        return super(WePay, self).checkout_create(*args, **kwargs)
 
-    def modify(self, **kwargs):
-        return super(PreapprovalCall, self).modify(self.local_object.pk, **kwargs)
+    @batchable
+    def checkout_cancel(self, *args, **kwargs):
+        return super(WePay, self).checkout_(*args, **kwargs)
 
-class WithdrawalCall(ApiCall, core.Withdrawal):
-    def __call__(self, **kwargs):
-        return super(WithdrawalCall, self).__call__(self.local_object.pk, **kwargs)
+    @batchable
+    def checkout_refund(self, *args, **kwargs):
+        return super(WePay, self).checkout_find(*args, **kwargs)
 
-    def create(self, *args, **kwargs):
-        kwargs_new = {}
-        if 'withdrawal' in self._defaults:
-            kwargs_new.update(self._defaults['withdrawal'])
-        kwargs_new.update(kwargs)
-        return super(WithdrawalCall, self).create(*args, **kwargs_new)
+    @batchable
+    def checkout_capture(self, *args, **kwargs):
+        return super(WePay, self).checkout_capture(*args, **kwargs)
 
-    def modify(self, **kwargs):
-        return super(WithdrawalCall, self).modify(self.local_object.pk, **kwargs)
-
-class CreditCardCall(ApiCall, core.CreditCard):
-    def __call__(self, **kwargs):
-        return super(CreditCardCall, self).__call__(
-            self._client_id, self._client_secret, self.local_object.pk, **kwargs)
-
-    def create(self, cc_number, cvv, expiration_month, expiration_year,
-               user_name, email, address, **kwargs):
-        return super(CreditCardCall, self).create(
-            self._clinet_id, cc_number, cvv, expiration_month, expiration_year,
-            user_name, email, address, **kwargs)
-
-    def authorize(self, **kwargs):
-        return super(CreditCardCall, self).authorize(
-            self._client_id, self._client_secret, self.local_object.pk, **kwargs)
-
-    def find(self, **kwargs):
-        return super(CreditCardCall, self).find(
-            self._client_id, self._client_secret, **kwargs)
-
-    def delete(self, **kwargs):
-        return super(CreditCardCall, self).delete(
-            self._client_id, self._client_secret, self.local_object.pk, **kwargs)
-
-class BatchCall(ApiCall, core.Batch):
-    pass
+    @batchable
+    def checkout_modify(self, *args, **kwargs):
+        return super(WePay, self).checkout_modify(*args, **kwargs)
 
 
-class WePay(core.WePayHandler):
+    @batchable
+    def preapproval(self, *args, **kwargs):
+        return super(WePay, self).preapproval(*args, **kwargs)
 
-    oauth2 = OAuth2Call
-    app = AppCall
-    user = UserCall
-    account = AccountCall
-    checkout = CheckoutCall
-    preapproval = PreapprovalCall
-    withdrawal = WithdrawalCall
-    credit_card = CreditCardCall
-    batch = BatchCall
+    @batchable
+    def preapproval_find(self, *args, **kwargs):
+        return super(WePay, self).preapproval_find(*args, **kwargs)
 
-    _calls_supported = ['oauth2', 'app', 'user', 'account', 'checkout', 
-                        'preapproval', 'withdrawal', 'credit_card', 'batch']
+    @batchable
+    def preapproval_create(self, *args, **kwargs):
+        return super(WePay, self).preapproval_create(*args, **kwargs)
 
-    def __init__(self, production=PRODUCTION, access_token=ACCESS_TOKEN):
-        super(WePay, self).__init__(production=production, access_token=access_token)
-        self.client_id = CLIENT_ID
-        self.client_secret = CLIENT_SECRET
-        for call_name in self._calls_supported:
-            call_class = getattr(self, call_name)
-            call = call_class(
-                production=production, access_token=access_token, handler=self)
-            setattr(self, call_name, call)
+    @batchable
+    def preapproval_cancel(self, *args, **kwargs):
+        return super(WePay, self).preapproval_cancel(*args, **kwargs)
+
+    @batchable
+    def preapproval_modify(self, *args, **kwargs):
+        return super(WePay, self).preapproval_modify(*args, **kwargs)
 
 
+    @batchable
+    def withdrawal(self, *args, **kwargs):
+        return super(WePay, self).withrawal(*args, **kwargs)
+
+    @batchable
+    def withdrawal_find(self, *args, **kwargs):
+        return super(WePay, self).withrawal_find(*args, **kwargs)
+
+    @batchable
+    def withdrawal_create(self, *args, **kwargs):
+        return super(WePay, self).withrawal_create(*args, **kwargs)
+
+    @batchable
+    def withdrawal_modify(self, *args, **kwargs):
+        return super(WePay, self).withrawal_modify(*args, **kwargs)
+
+
+    @batchable
+    def credit_card(self, credit_card_id, *args, **kwargs):
+        return super(WePay, self).credit_card(
+            self._app.client_id, self._app.client_secret, credit_card_id, *args,
+            access_token=self._app.access_token, **kwargs)
+
+    @batchable
+    def credit_card_create(self, *args, **kwargs):
+        return super(WePay, self).credit_card_create(
+            self._app.client_id, *args, access_token=self._app.access_token, 
+            **kwargs)
+
+    @batchable
+    def credit_card_authorize(self, credit_card_id, *args, **kwargs):
+        return super(WePay, self).credit_card_authorize(
+            self._app.client_id, self._app.client_secret, credit_card_id, *args,
+            access_token=self._app.access_token, **kwargs)
+
+    @batchable
+    def credit_card_find(self, *args, **kwargs):
+        return super(WePay, self).credit_card_find(
+            self._app.client_id, self._app.client_secret, *args, 
+            access_token=self._app.access_token, **kwargs)
+
+    @batchable
+    def credit_card_delete(self, credit_card_id, *args, **kwargs):
+        return super(WePay, self).credit_card_delete(
+            self._app.client_id, self._app.client_secret, credit_card_id, *args,
+            access_token=self._app.access_token, **kwargs)
+
+
+    def batch_create(self, batch_id, **kwargs):
+        batch_key = make_batch_key(batch_id)
+        calls = cache.get(batch_key)
+        calls_response = []
+        while calls:
+            cur_calls = calls[:50]
+            cache.set(batch_key, calls[50:], CACHE_BATCH_TIMEOUT)
+            response = super(WePay, self).batch_create(
+                self._app.client_id, self._app.client_secret, calls, **kwargs)
+            calls_response.extend(response['calls'])
+            calls = cache.get(batch_key)            
+        return {'calls': calls_response}
+
+    def batch_clear(self, batch_id):
+        cache.delete(make_batch_key(batch_id))
+
+    def batch_get_calls(self, batch_id):
+        return cache.get(make_batch_key(batch_id))
+
+    def batch_set_calls(self, batch_id, calls):
+        cache.set(make_batch_key(batch_id), calls, CACHE_BATCH_TIMEOUT)
