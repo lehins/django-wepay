@@ -98,7 +98,9 @@ class BaseModel(models.Model):
             return uri
         return None
 
-   
+    def _api_callback_uri(self, obj_name, **kwargs):
+        return self.api.get_full_uri(reverse('wepay:ipn:%s', kwargs=kwargs))
+
     def _api_property_getter(self, prop_name, getter=None, updater=None):
         if getattr(self, prop_name, None) is None:
             if not getter is None and callable(getter):
@@ -202,16 +204,16 @@ class App(BaseModel):
     def api_preapproval_create(self, *args, **kwargs):
         update = kwargs.pop('update', True)
         commit = kwargs.pop('commit', True)
-        if 'callback_uri' not in kwargs:
-            kwargs['callback_uri'] = self.api.get_full_uri(
-                reverse('wepay:ipn:preapproval'))
-        else:
-            kwargs.update({
-                'callback_uri': self.api.get_full_uri(kwargs['callback_uri'])
-            })
+        if not self._api_uri_modifier(kwargs):
+            kwargs['callback_uri'] = self._api_callback_uri('preapproval', obj_name)
+        self._api_uri_modifier(kwargs, name='redirect_uri')
+        self._api_uri_modifier(kwargs, name='fallback_uri')
         response = self.api.preapproval_create(
             self.client_id, *args, access_token=self.client_secret, **kwargs)
         return self._api_create(Preapproval, response, update, commit)
+
+    def api_preapproval_find(self, **kwargs):
+        return self.api.preapproval_find(**kwargs)
 
     def api_credit_card_create(self, *args, **kwargs):
         update = kwargs.pop('update', True)
@@ -220,8 +222,8 @@ class App(BaseModel):
         return self._api_create(CreditCard, response, update, commit, 
                                 object_name='credit_card')
 
-    def api_credit_card_find(self, *args, **kwargs):
-        return self.api.credit_card_find(*args, **kwargs)
+    def api_credit_card_find(self, **kwargs):
+        return self.api.credit_card_find(**kwargs)
 
     class Meta:
         db_table = 'djwepay_app'
@@ -268,6 +270,7 @@ class User(BaseModel):
             account.undelete()
         super(User, self).undelete()
 
+
     def get_callback_uri(self):
         return reverse('wepay:ipn:user')
 
@@ -302,9 +305,9 @@ class User(BaseModel):
             account.save()
         return account, response
 
-    def api_account_find(self, *args, **kwargs):
+    def api_account_find(self, **kwargs):
         return self.api.account_find(
-            *args, access_token=self.access_token, **kwargs)
+            access_token=self.access_token, **kwargs)
 
     class Meta:
         db_table = 'djwepay_user'
@@ -360,12 +363,6 @@ class Account(BaseModel):
     def access_token(self, value):
         self._access_token = value
 
-    def _balance_call_updater(self):
-        # can't call api_account_balance due to recursive 'hasattr' in _api_update
-        response = self.api.account_balance(self.pk, access_token=self.access_token)
-        for key, value in response.iteritems():
-            setattr(self, key, value)
-        
     @property
     def pending_balance(self):
         return self._api_property_getter(
@@ -378,7 +375,7 @@ class Account(BaseModel):
     @property
     def available_balance(self):
         return self._api_property_getter(
-            '_available_balance', updater=self._balance_call_updater)
+            '_available_balance', updater=self.api_account_balance)
 
     @available_balance.setter
     def available_balance(self, value):
@@ -387,7 +384,7 @@ class Account(BaseModel):
     @property
     def pending_amount(self):
         return self._api_property_getter(
-            '_pending_amount', updater=self._balance_call_updater)
+            '_pending_amount', updater=self.api_account_balance)
 
     @pending_amount.setter
     def pending_amount(self, value):
@@ -396,7 +393,7 @@ class Account(BaseModel):
     @property
     def reserved_amount(self):
         return self._api_property_getter(
-            '_reserved_amount', updater=self._balance_call_updater)
+            '_reserved_amount', updater=self.api_account_balance)
 
     @reserved_amount.setter
     def reserved_amount(self, value):
@@ -405,7 +402,7 @@ class Account(BaseModel):
     @property
     def disputed_amount(self):
         return self._api_property_getter(
-            '_disputed_amount', updater=self._balance_call_updater)
+            '_disputed_amount', updater=self.api_account_balance)
 
     @disputed_amount.setter
     def disputed_amount(self, value):
@@ -445,10 +442,9 @@ class Account(BaseModel):
         super(Account, self).undelete()
 
     def get_callback_uri(self):
-        return reverse('wepay:ipn:account', 
-                       kwargs={'user_id': self.user_id})
+        return self._api_callback_uri('account', user_id = self.user_id)
 
-    def api_account(self, *args, **kwargs):
+    def api_account(self, **kwargs):
         try:
             return self._api_update(self.api.account(
                 self.pk, access_token=self.access_token, *args, **kwargs))
@@ -463,14 +459,14 @@ class Account(BaseModel):
         image_uri = self._api_uri_modifier(kwargs, name='image_uri')
         response = self._api_update(self.api.account_modify(
             self.pk, access_token=self.access_token, **kwargs))
-        if callback_uri or image_uri:
+        if callback_uri or image_uri: # after the call is successfull, update model
             self.save()
         return response
         
     def api_account_delete(self, **kwargs):
         response = self._api_update(self.api.account_delete(
             self.pk, access_token=self.access_token, **kwargs))
-        self.save()
+        self.save() # save deleted status right away
         return response
 
     def api_account_balance(self, **kwargs):
@@ -478,10 +474,7 @@ class Account(BaseModel):
             self.pk, access_token=self.access_token, **kwargs))
         
     def api_account_add_bank(self, **kwargs):
-        if 'redirect_uri' in kwargs:
-            kwargs.update({
-                'redirect_uri': self.api.get_full_uri(kwargs['redirect_uri'])
-            })
+        self._api_uri_modifier(kwargs, name='redirect_uri')
         return self._api_update(self.api.account_add_bank(
             self.pk, access_token=self.access_token, **kwargs))
 
@@ -493,22 +486,14 @@ class Account(BaseModel):
         return self.api.account_get_tax(
             self.pk, access_token=self.access_token, **kwargs)
 
-    def _api_account_object_create(model, *args, **kwargs):
+    def _api_account_object_create(self, model, *args, **kwargs):
         obj_name = model.__name__.lower()
         update = kwargs.pop('update', True)
         commit = kwargs.pop('commit', True)
-        if 'callback_uri' not in kwargs:
-            kwargs['callback_uri'] = self.api.get_full_uri(
-                reverse('wepay:ipn:%s' % obj_name, 
-                        kwargs={'user_id': self.user_id}))
-        else:
-            kwargs.update({
-                'callback_uri': self.api.get_full_uri(kwargs['callback_uri'])
-            })
-        if 'redirect_uri' in kwargs:
-            kwargs.update({
-                'redirect_uri': self.api.get_full_uri(kwargs['redirect_uri'])
-            })
+        if not self._api_uri_modifier(kwargs):
+            kwargs['callback_uri'] = self._api_callback_uri(
+                obj_name, user_id=self.user_id)
+        self._api_uri_modifier(kwargs, name='redirect_uri')
         method_create = getattr(self.api, "%s_create" % obj_name)
         response = method_create(
             self.pk, *args, access_token=self.access_token, **kwargs)
@@ -527,17 +512,17 @@ class Account(BaseModel):
     def api_withdrawal_create(self, *args,  **kwargs):
         return self._api_account_object_create(Withdrawal, *args, **kwargs)
 
-    def api_checkout_find(self, *args, **kwargs):
+    def api_checkout_find(self, **kwargs):
         return self.api.checkout_find(
-            self.pk, *args, access_token=self.access_token, **kwargs)
+            self.pk, access_token=self.access_token, **kwargs)
 
-    def api_preapproval_find(self, *args, **kwargs):
+    def api_preapproval_find(self, **kwargs):
         return self.api.preapproval_find(
-            self.pk, *args, access_token=self.access_token, **kwargs)
+            account_id=self.pk, access_token=self.access_token, **kwargs)
 
-    def api_withdrawal_find(self, *args, **kwargs):
+    def api_withdrawal_find(self, **kwargs):
         return self.api.withdrawal_find(
-            self.pk, *args, access_token=self.access_token, **kwargs)
+            self.pk, access_token=self.access_token, **kwargs)
 
     class Meta:
         db_table = 'djwepay_account'
@@ -621,12 +606,11 @@ class Checkout(BaseModel):
         return "%s - %s" % (self.pk, self.short_description)
 
     def get_callback_uri(self):
-        return reverse('wepay:ipn:checkout', 
-                       kwargs={'user_id': self.account.user_id})
+        return self._api_callback_uri('checkout', user_id = self.account.user_id)
 
-    def api_checkout(self, *args, **kwargs):
+    def api_checkout(self, **kwargs):
         return self._api_update(self.api.checkout(
-            self.pk, *args, access_token=self.access_token, **kwargs))
+            self.pk, access_token=self.access_token, **kwargs))
 
     def api_checkout_cancel(self, *args, **kwargs):
         return self._api_update(self.api.checkout_cancel(
@@ -636,14 +620,14 @@ class Checkout(BaseModel):
         return self._api_update(self.api.checkout_refund(
             self.pk, *args, access_token=self.access_token, **kwargs))
 
-    def api_checkout_capture(self, *args, **kwargs):
+    def api_checkout_capture(self, **kwargs):
         return self._api_update(self.api.checkout_capture(
-            self.pk, *args, access_token=self.access_token, **kwargs))
+            self.pk, access_token=self.access_token, **kwargs))
 
-    def api_checkout_modify(self, *args, **kwargs):
+    def api_checkout_modify(self, **kwargs):
         callback_uri = self._api_uri_modifier(kwargs)
         response = self._api_update(self.api.checkout_modify(
-            self.pk, *args, access_token=self.access_token, **kwargs))
+            self.pk, access_token=self.access_token, **kwargs))
         if callback_uri:
             self.save()
         return response
@@ -731,21 +715,20 @@ class Preapproval(BaseModel):
         return "%s - %s" % (self.pk, self.short_description)
 
     def get_callback_uri(self):
-        return reverse('wepay:ipn:preapproval', 
-                       kwargs={'user_id': self.account.user_id})
+        return self._api_callback_uri('preapproval', user_id = self.account.user_id)
 
-    def api_preapproval(self, *args, **kwargs):
+    def api_preapproval(self, **kwargs):
         return self._api_update(self.api.preapproval(
-            self.pk, *args, access_token=self.access_token, **kwargs))
+            self.pk, access_token=self.access_token, **kwargs))
 
-    def api_preapproval_cancel(self, *args, **kwargs):
+    def api_preapproval_cancel(self, **kwargs):
         return self._api_update(self.api.preapproval_cancel(
-            self.pk, *args, access_token=self.access_token, **kwargs))
+            self.pk, access_token=self.access_token, **kwargs))
 
-    def api_preapproval_modify(self, *args, **kwargs):
+    def api_preapproval_modify(self, **kwargs):
         callback_uri = self._api_uri_modifier(kwargs)
         response = self._api_update(self.api.preapproval_modify(
-            self.pk, *args, access_token=self.access_token, **kwargs))
+            self.pk, access_token=self.access_token, **kwargs))
         if callback_uri:
             self.save()
         return response
@@ -786,7 +769,15 @@ class Withdrawal(BaseModel):
 
     callback_uri = models.URLField(blank=True)
     redirect_uri = None
-    withdrawal_uri = None
+
+    @property
+    def withdrawal_uri(self):
+        return self._api_property_getter(
+            '_withdrawal_uri', updater=self.api_withdrawal)
+
+    @withdrawal_uri.setter
+    def withdrawal_uri(self, value):
+        self._withdrawal_uri = value
 
     @property
     def access_token(self):
@@ -802,17 +793,16 @@ class Withdrawal(BaseModel):
         return "%s - %s" % (self.pk, self.amount)
 
     def get_callback_uri(self):
-        return reverse('wepay:ipn:withdrawal', 
-                       kwargs={'user_id': self.account.user_id})
+        return self._api_callback_uri('withdrawal', user_id = self.account.user_id)
 
-    def api_withdrawal(self, *args, **kwargs):
+    def api_withdrawal(self, **kwargs):
         return self._api_update(self.api.withdrawal(
-            self.pk, *args, access_token=self.access_token, **kwargs))
+            self.pk, access_token=self.access_token, **kwargs))
 
-    def api_withdrawal_modify(self, *args, **kwargs):
+    def api_withdrawal_modify(self, **kwargs):
         callback_uri = self._api_uri_modifier(kwargs)
         response = self._api_update(self.api.withdrawal_modify(
-            self.pk, *args, access_token=self.access_token, **kwargs))
+            self.pk, access_token=self.access_token, **kwargs))
         if callback_uri:
             self.save()
         return response
@@ -842,17 +832,14 @@ class CreditCard(BaseModel):
     auth_users = models.ManyToManyField(
         get_user_model(), related_name='wepay_credit_card', null=True)
 
-    def api_credit_card(self, *args, **kwargs):
-        return credit_card._api_update(
-            self.api.credit_card(self.pk, *args, **kwargs))
+    def api_credit_card(self, **kwargs):
+        return self._api_update(self.api.credit_card(self.pk, **kwargs))
 
-    def api_credit_card_authorize(self, *args, **kwargs):
-        return self._api_update(
-            self.api.credit_card_authorize(self.pk, *args, **kwargs))
+    def api_credit_card_authorize(self, **kwargs):
+        return self._api_update(self.api.credit_card_authorize(self.pk, **kwargs))
 
-    def api_credit_card_delete(self, *args, **kwargs):
-        return self._api_update(
-            self.api.credit_card_delete(self.pk, *args, **kwargs))
+    def api_credit_card_delete(self, **kwargs):
+        return self._api_update(self.api.credit_card_delete(self.pk, **kwargs))
 
     
     class Meta:

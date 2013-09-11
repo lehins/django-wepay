@@ -1,4 +1,4 @@
-import cookielib, mechanize, urllib, urllib2, urlparse, random
+import cookielib, mechanize, urllib, urllib2, urlparse, random, time
 from decimal import Decimal
 
 from django.conf import settings
@@ -106,41 +106,8 @@ class WePayTestCase(TestCase):
                     acc_id, access_token=cls.user.access_token)
             except WePayError: pass
 
-    def _preapproval_create(self, test_amount):
-        optional_params={'mode': 'regular',
-                         'redirect_uri': self.test_uri,
-                         'callback_uri': self.test_uri,
-                         'require_shipping': True,
-                         'amount': test_amount}
-        preapproval = self.dwepay.preapproval_create(
-            self.account, "Create preapproval test", "once", **optional_params)
-        browser = browser_create()
-        browser.open(preapproval.preapproval_uri)
-        browser.select_form(nr=1)
-        browser.form['nameOnCard'] = "Test Name"
-        browser.form['number'] = self.testcc
-        browser.form['expirationMonth'] = "02"
-        browser.form['expirationYear'] = "17"
-        browser.form['cvv2'] = "123"
-        browser.form['address[address1]'] = "123 Main Str"
-        browser.form['address[city]'] = "Albuquerque"
-        browser.form['address[address1]'] = "123 Main Str"
-        browser.form['address[state]'] = ["NM"]
-        browser.form['address[zip]'] = "87121"
-        browser.submit()
-        browser.select_form(nr=0)
-        browser.form['name'] = "Test Shipping Name"
-        browser.form['shipping_address[address1]'] = "123 Main Str"
-        browser.form['shipping_address[city]'] = "Albuquerque"
-        browser.form['shipping_address[state]'] = ["NM"]
-        browser.form['shipping_address[zip]'] = "87121"
-        browser.form['phone'] = "5055551234"
-        browser.submit()
-        browser.select_form(nr=0)
-        browser.form['email'] = self.email
-        browser.form['save_info'] = False
-        browser.submit()
-        return preapproval
+    def _reference_id(self):
+        return random.randint(1, 10000000)
 
     def _validate_equality(self, obj, response):
         for key, value in response.iteritems():
@@ -157,6 +124,8 @@ class WePayTestCase(TestCase):
         self.app.save()
         gaq_domains = self.app.gaq_domains
         theme_object = self.app.theme_object
+        if not theme_object is None:
+            theme_object.pop('theme_id', None)
         response = self.app.api_app_modify(
             theme_object=TEST_THEME, gaq_domains=TEST_GAQ_DOMAINS)
         self.app.save()
@@ -245,7 +214,7 @@ class WePayTestCase(TestCase):
             name, "Account created during running of the "
             "django-wepay tests, it wasn't deleted probably due to a failing "
             "test case. You can safely remove it.", 
-            reference_id=random.randint(1, 10000000), type='nonprofit',
+            reference_id=self._reference_id(), type='nonprofit',
             image_uri='http://www.placekitten.com/500/500',
             gaq_domains=TEST_GAQ_DOMAINS, theme_object=TEST_THEME, mcc=7299)
         self.assertIsNotNone(acc.account_uri)
@@ -281,6 +250,8 @@ class WePayTestCase(TestCase):
         response = acc.api_account_get_tax()
         self.assertEqual(taxes, response)
 
+                            
+
         acc.api_account_delete(reason='test finished')
 
     def test_account_find(self):
@@ -291,9 +262,9 @@ class WePayTestCase(TestCase):
         
     def test_checkout(self):
         checkout, response = self.account.api_checkout_create(
-            "Test Checkout", "DONATION", 10, long_description="Long test Checkout",
+            "Test Checkout", "DONATION", 1010, long_description="Long test Checkout",
             payer_email_message="test@example.com", payee_email_message="Ssup",
-            reference_id=random.randint(1, 10000000), app_fee=2, fee_payer='payee',
+            reference_id=self._reference_id(), app_fee=2, fee_payer='payee',
             redirect_uri=self.test_uri, auto_capture=True, require_shipping=True,
             shipping_fee=2, charge_tax=True, mode='iframe', prefill_info={
             "name": "Bill Clerico", "phone_number": "855-469-3729"},
@@ -302,3 +273,35 @@ class WePayTestCase(TestCase):
         response = checkout.api_checkout_modify(callback_uri=self.test_uri)
         self.assertEqual(
             checkout.api.get_full_uri(self.test_uri), checkout.callback_uri)
+        try:
+            checkout.api_checkout_capture()
+        except WePayError, e:
+            self.assertEqual(e.code, 4004)
+        try:
+            checkout.api_checkout_refund("test refund reason")
+        except WePayError, e:
+            self.assertEqual(e.code, 4004)
+        try:
+            checkout.api_checkout_cancel("test cancel reason")
+        except WePayError, e:
+            self.assertEqual(e.code, 4004)
+
+    def test_finds(self):
+        self.user.api_account_find(
+            name='some name', reference_id=12345, sort_order='DESC')
+
+        self.account.api_checkout_find(
+            start=0, limit=10, reference_id=12345, state='new',
+            preapproval_id=12345, start_time=int(time.time()-1000),
+            end_time=int(time.time()), sort_order='ASC', shipping_fee=3)
+
+        self.account.api_preapproval_find(
+            state='new', reference_id=12355, start=int(time.time()-1000),
+            sort_order='ASC', last_checkout_id=65865, shipping_fee=3)
+
+        self.account.api_withdrawal_find(
+            limit=5, start=int(time.time()-1000), sort_order='ASC')
+            
+        self.app.api_credit_card_find(reference_id=12345, limit=6, 
+                                      start=int(time.time()-1000), sort_order='ASC')
+        
