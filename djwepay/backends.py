@@ -72,12 +72,15 @@ class WePay(PythonWePay):
         return '/'.join(uri_list)
 
    
-    def oauth2_authorize(self, redirect_uri, **kwargs):
+    def oauth2_authorize(self, **kwargs):
+        redirect_uri = kwargs.pop('redirect_uri')
         return super(WePay, self).oauth2_authorize(
             self._app.client_id, redirect_uri, DEFAULT_SCOPE, **kwargs)
 
     @batchable
-    def oauth2_token(self, redirect_uri, code, **kwargs):
+    def oauth2_token(self, **kwargs):
+        redirect_uri = kwargs.pop('redirect_uri')
+        code = kwargs.pop('code')
         return super(WePay, self).oauth2_token(
             self._app.client_id, redirect_uri, self._app.client_secret, code, 
             **kwargs)
@@ -104,113 +107,149 @@ class WePay(PythonWePay):
 
 
     @batchable
-    def account(self, *args, **kwargs):
-        return super(WePay, self).account(*args, **kwargs)
+    def account(self, **kwargs):
+        return super(WePay, self).account(**kwargs)
 
     @batchable
     def account_find(self, **kwargs):
         return super(WePay, self).account_find(**kwargs)
 
     @batchable
-    def account_create(self, *args, **kwargs):
-        return super(WePay, self).account_create(*args, **kwargs)
+    def account_create(self, **kwargs):
+        name = kwargs.pop('name')
+        description = kwargs.pop('description')
+        return super(WePay, self).account_create(
+            name, description, **kwargs)
 
     @batchable
-    def account_modify(self, *args, **kwargs):
-        return super(WePay, self).account_modify(*args, **kwargs)
+    def account_modify(self, **kwargs):
+        account_id = kwargs.pop('account_id')
+        return super(WePay, self).account_modify(account_id, **kwargs)
 
     @batchable
-    def account_delete(self, *args, **kwargs):
-        return super(WePay, self).account_delete(*args, **kwargs)
+    def account_delete(self, **kwargs):
+        account_id = kwargs.pop('account_id')
+        return super(WePay, self).account_delete(account_id, **kwargs)
 
     @batchable
-    def account_balance(self, *args, **kwargs):
-        return super(WePay, self).account_balance(*args, **kwargs)
+    def account_balance(self, **kwargs):
+        account_id = kwargs.pop('account_id')
+        return super(WePay, self).account_balance(account_id, **kwargs)
         
     @batchable
-    def account_add_bank(self, *args, **kwargs):
-        return super(WePay, self).account_add_bank(*args, **kwargs)
+    def account_add_bank(self, **kwargs):
+        account_id = kwargs.pop('account_id')
+        return super(WePay, self).account_add_bank(account_id, **kwargs)
         
     @batchable
-    def account_set_tax(self, *args, **kwargs):
-        return super(WePay, self).account_set_tax(*args, **kwargs)
+    def account_set_tax(self, **kwargs):
+        account_id = kwargs.pop('account_id')
+        taxes = kwargs.pop('taxes')
+        return super(WePay, self).account_set_tax(account_id, taxes, **kwargs)
 
     @batchable
-    def account_get_tax(self, *args, **kwargs):
-        return super(WePay, self).account_get_tax(*args, **kwargs)
-
-
-    @batchable
-    def checkout(self, *args, **kwargs):
-        return super(WePay, self).checkout(*args, **kwargs)
-
-    @batchable
-    def checkout_find(self, *args, **kwargs):
-        return super(WePay, self).checkout_find(*args, **kwargs)
-
-    @batchable
-    def checkout_create(self, *args, **kwargs):
-        return super(WePay, self).checkout_create(*args, **kwargs)
-
-    @batchable
-    def checkout_cancel(self, *args, **kwargs):
-        return super(WePay, self).checkout_cancel(*args, **kwargs)
-
-    @batchable
-    def checkout_refund(self, *args, **kwargs):
-        return super(WePay, self).checkout_refund(*args, **kwargs)
-
-    @batchable
-    def checkout_capture(self, *args, **kwargs):
-        return super(WePay, self).checkout_capture(*args, **kwargs)
-
-    @batchable
-    def checkout_modify(self, *args, **kwargs):
-        return super(WePay, self).checkout_modify(*args, **kwargs)
+    def account_get_tax(self, **kwargs):
+        account_id = kwargs.pop('account_id')
+        return super(WePay, self).account_get_tax(account_id, **kwargs)
 
 
     @batchable
-    def preapproval(self, *args, **kwargs):
-        return super(WePay, self).preapproval(*args, **kwargs)
+    def checkout(self, **kwargs):
+        checkout_id = kwargs.pop('checkout_id')
+        return super(WePay, self).checkout(checkout_id, **kwargs)
+
+    @batchable
+    def checkout_find(self, **kwargs):
+        account_id = kwargs.pop('account_id')
+        return super(WePay, self).checkout_find(account_id, **kwargs)
+
+    @batchable
+    def checkout_create(self, **kwargs):
+        account_id = kwargs.pop('account_id')
+        short_description = kwargs.pop('short_description')
+        type = kwargs.pop('type')
+        amount = kwargs.pop('amount')
+        return super(WePay, self).checkout_create(
+            account_id, short_description, type, amount, **kwargs)
+
+    @batchable
+    def checkout_cancel(self, **kwargs):
+        checkout_id = kwargs.pop('checkout_id')
+        cancel_reason = kwargs.pop('cancel_reason')
+        return super(WePay, self).checkout_cancel(
+            checkout_id, cancel_reason, **kwargs)
+
+    @batchable
+    def checkout_refund(self, **kwargs):
+        checkout_id = kwargs.pop('checkout_id')
+        refund_reason = kwargs.pop('refund_reason')
+        return super(WePay, self).checkout_refund(
+            checkout_id, refund_reason, **kwargs)
+
+    @batchable
+    def checkout_capture(self, **kwargs):
+        checkout_id = kwargs.pop('checkout_id')
+        return super(WePay, self).checkout_capture(checkout_id, **kwargs)
+
+    @batchable
+    def checkout_modify(self, **kwargs):
+        checkout_id = kwargs.pop('checkout_id')
+        return super(WePay, self).checkout_modify(checkout_id, **kwargs)
+
+
+    @batchable
+    def preapproval(self, **kwargs):
+        preapproval_id = kwargs.pop('preapproval_id')
+        return super(WePay, self).preapproval(preapproval_id, **kwargs)
 
     @batchable
     def preapproval_find(self, **kwargs):
         return super(WePay, self).preapproval_find(**kwargs)
 
     @batchable
-    def preapproval_create(self, *args, **kwargs):
-        return super(WePay, self).preapproval_create(*args, **kwargs)
+    def preapproval_create(self, **kwargs):
+        short_description = kwargs.pop('short_description')
+        period = kwargs.pop('period')
+        return super(WePay, self).preapproval_create(
+            short_description, period, **kwargs)
 
     @batchable
-    def preapproval_cancel(self, *args, **kwargs):
-        return super(WePay, self).preapproval_cancel(*args, **kwargs)
+    def preapproval_cancel(self, **kwargs):
+        preapproval_id = kwargs.pop('preapproval_id')
+        return super(WePay, self).preapproval_cancel(preapproval_id, **kwargs)
 
     @batchable
-    def preapproval_modify(self, *args, **kwargs):
-        return super(WePay, self).preapproval_modify(*args, **kwargs)
-
-
-    @batchable
-    def withdrawal(self, *args, **kwargs):
-        return super(WePay, self).withdrawal(*args, **kwargs)
-
-    @batchable
-    def withdrawal_find(self, *args, **kwargs):
-        return super(WePay, self).withdrawal_find(*args, **kwargs)
-
-    @batchable
-    def withdrawal_create(self, *args, **kwargs):
-        return super(WePay, self).withdrawal_create(*args, **kwargs)
-
-    @batchable
-    def withdrawal_modify(self, *args, **kwargs):
-        return super(WePay, self).withdrawal_modify(*args, **kwargs)
+    def preapproval_modify(self, **kwargs):
+        preapproval_id = kwargs.pop('preapproval_id')
+        return super(WePay, self).preapproval_modify(preapproval_id, **kwargs)
 
 
     @batchable
-    def credit_card(self, *args, **kwargs):
+    def withdrawal(self, **kwargs):
+        withdrawal_id = kwargs.pop('withdrawal_id')
+        return super(WePay, self).withdrawal(withdrawal_id, **kwargs)
+
+    @batchable
+    def withdrawal_find(self, **kwargs):
+        account_id = kwargs.pop('account_id')
+        return super(WePay, self).withdrawal_find(account_id, **kwargs)
+
+    @batchable
+    def withdrawal_create(self, **kwargs):
+        account_id = kwargs.pop('account_id')
+        return super(WePay, self).withdrawal_create(account_id, **kwargs)
+
+    @batchable
+    def withdrawal_modify(self, **kwargs):
+        withdrawal_id = kwargs.pop('withdrawal_id')
+        return super(WePay, self).withdrawal_modify(withdrawal_id, **kwargs)
+
+
+    @batchable
+    def credit_card(self, **kwargs):
+        credit_card_id = kwargs.pop('credit_card_id')
         return super(WePay, self).credit_card(
-            self._app.client_id, self._app.client_secret, *args, **kwargs)
+            self._app.client_id, self._app.client_secret, credit_card_id, **kwargs)
 
     @batchable
     def credit_card_create(self, *args, **kwargs):
@@ -218,9 +257,10 @@ class WePay(PythonWePay):
             self._app.client_id, *args, **kwargs)
 
     @batchable
-    def credit_card_authorize(self, *args, **kwargs):
+    def credit_card_authorize(self, **kwargs):
+        credit_card_id = kwargs.pop('credit_card_id')
         return super(WePay, self).credit_card_authorize(
-            self._app.client_id, self._app.client_secret, *args, **kwargs)
+            self._app.client_id, self._app.client_secret, credit_card_id, **kwargs)
 
     @batchable
     def credit_card_find(self, **kwargs):
@@ -228,9 +268,10 @@ class WePay(PythonWePay):
             self._app.client_id, self._app.client_secret, **kwargs)
 
     @batchable
-    def credit_card_delete(self, *args, **kwargs):
+    def credit_card_delete(self, **kwargs):
+        credit_card_id = kwargs.pop('credit_card_id')
         return super(WePay, self).credit_card_delete(
-            self._app.client_id, self._app.client_secret, *args, **kwargs)
+            self._app.client_id, self._app.client_secret, credit_card_id, **kwargs)
 
 
     def batch_create(self, batch_id, **kwargs):

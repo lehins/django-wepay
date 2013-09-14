@@ -32,15 +32,16 @@ TEST_GAQ_DOMAINS = [
 TEST_CC = {
     'nameOnCard': "Test Dude",
     'number': "4003830171874018",
-    'expirationMonth': "02",
-    'expirationYear': "17",
+    'expMonth': "02",
+    'expYear': "17",
     'cvv2': "123",
 }
 TEST_ADDRESS = {
     'address1': "123 Main Stret",
     'city': "Albuquerque",
-    'state': ["NM"],
+    'state': "NM",
     'zip': "87108",
+    'country': "US"
 }
 
 App = get_wepay_model('app')
@@ -103,15 +104,15 @@ class WePayTestCase(TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        # if any of the tests where temporary objects are created fails, tearDownClass
-        # performs the best attempt in removing them from WePay system
+        # if any of the tests where temporary objects are created fails, 
+        # tearDownClass performs the best attempt in removing them from WePay system
         accs = cls.user.api_account_find()
         acc_ids = [x['account_id'] for x in accs 
                    if x['account_id'] != TEST_ACCOUNT_ID]
         for acc_id in acc_ids:
             try:
                 cls.user.api.account_delete(
-                    acc_id, access_token=cls.user.access_token)
+                    account_id=acc_id, access_token=cls.user.access_token)
             except WePayError: pass
 
     def _reference_id(self):
@@ -148,7 +149,7 @@ class WePayTestCase(TestCase):
         """ Tests calls: /oauth2/authorize, /oauth2/token, /user/modify."""
         if TEST_LOGIN and TEST_PASSWORD:
             # get authentication url
-            auth_url = self.app.api_oauth2_authorize(self.test_uri)
+            auth_url = self.app.api_oauth2_authorize(redirect_uri=self.test_uri)
             self.browser.open(auth_url)
             # fillout the form
             self.browser.select_form(nr=0)
@@ -164,7 +165,8 @@ class WePayTestCase(TestCase):
             url = self.browser.response().geturl()
             self.assertTrue(url.startswith(self.app.api.get_full_uri(self.test_uri)))
             code = urlparse.parse_qs(urlparse.urlparse(url).query)['code'][0]
-            user, response = self.app.api_oauth2_token(self.test_uri, code)
+            user, response = self.app.api_oauth2_token(
+                redirect_uri=self.test_uri, code=code)
             user.api_user_modify(callback_uri=self.test_uri)
             self.assertEqual(TEST_LOGIN, user.email)
             self._validate_equality(user, response)
@@ -213,7 +215,7 @@ class WePayTestCase(TestCase):
         """
         name = "Runtime Test Account"
         acc, response = self.user.api_account_create(
-            name, "Account created during running of the "
+            name=name, description="Account created during running of the "
             "django-wepay tests, it wasn't deleted probably due to a failing "
             "test case. You can safely remove it.", 
             reference_id=self._reference_id(), type='nonprofit',
@@ -251,24 +253,18 @@ class WePayTestCase(TestCase):
             {u"percent":7, u"country": u"US", u"state": u"CA", u"zip": None},
             {u"percent":5, u"country": u"US", u"state": None, u"zip": None},
         ]
-        response = acc.api_account_set_tax(taxes)
+        response = acc.api_account_set_tax(taxes=taxes)
         self.assertEqual(taxes, response)
         response = acc.api_account_get_tax()
         self.assertEqual(taxes, response)
 
-                            
-
         acc.api_account_delete(reason='test finished')
 
-    def test_account_find(self):
-        accs = self.user.api_account_find()
-        acc_ids = [x['account_id'] for x in accs 
-                   if x['account_id'] == TEST_ACCOUNT_ID]
-        self.assertTrue(len(acc_ids) > 0)
-        
+      
     def test_checkout(self):
         checkout, response = self.account.api_checkout_create(
-            "Test Checkout", "DONATION", 1010, long_description="Long test Checkout",
+            short_description="Test Checkout", type="DONATION", amount=1010, 
+            long_description="Long description testing Checkout",
             payer_email_message="test@example.com", payee_email_message="Ssup",
             reference_id=self._reference_id(), app_fee=2, fee_payer='payee',
             redirect_uri=self.test_uri, auto_capture=True, require_shipping=True,
@@ -276,6 +272,9 @@ class WePayTestCase(TestCase):
             "name": "Bill Clerico", "phone_number": "855-469-3729"},
             funding_sources='bank')
         self._validate_equality(checkout, response)
+        self.assertIsNotNone(checkout.redirect_uri)
+        self.assertIsNotNone(checkout.callback_uri)
+        #self.assertIsNotNone(checkout.dispute_uri) - empty on new checkouts
         response = checkout.api_checkout_modify(callback_uri=self.test_uri)
         self.assertEqual(
             checkout.api.get_full_uri(self.test_uri), checkout.callback_uri)
@@ -284,11 +283,11 @@ class WePayTestCase(TestCase):
         except WePayError, e:
             self.assertEqual(e.code, 4004)
         try:
-            checkout.api_checkout_refund("test refund reason")
+            checkout.api_checkout_refund(refund_reason="test refund reason")
         except WePayError, e:
             self.assertEqual(e.code, 4004)
         try:
-            checkout.api_checkout_cancel("test cancel reason")
+            checkout.api_checkout_cancel(cancel_reason="test cancel reason")
         except WePayError, e:
             self.assertEqual(e.code, 4004)
 
@@ -311,3 +310,56 @@ class WePayTestCase(TestCase):
         self.app.api_credit_card_find(reference_id=12345, limit=6, 
                                       start=int(time.time()-1000), sort_order='ASC')
         
+
+    def test_preapproval(self):
+        """Tests calls: /preapproval, /preapproval/create, /preapproval/modify,
+        /preapproval/cancel
+        """
+        preapproval, reposnse = self.account.api_preapproval_create(
+            short_description="Testing preapprovals", period="daily", 
+            amount=Decimal('1000.00'), reference_id=self._reference_id(),
+            app_fee=Decimal('99.99'), fee_payer="payee_from_app",
+            redirect_uri=self.test_uri, callback_uri=self.test_uri,
+            fallback_uri=self.test_uri, require_shipping=True,
+            shipping_fee=Decimal('5.00'), charge_tax=True,
+            payer_email_message="Testin preapproval message for payer",
+            long_description="Very long description testing preapprovals",
+            frequency=60, start_time=int(time.time()+600), 
+            end_time=int(time.time()+5000000), auto_recur=True, mode="iframe",
+            prefill_info={'name': "Joe Blow"}, funding_sources="bank,cc")
+        self.assertIsNotNone(preapproval.preapproval_uri)
+        self.assertIsNotNone(preapproval.manage_uri)
+        self.assertIsNotNone(preapproval.redirect_uri)
+        self.assertIsNotNone(preapproval.callback_uri)
+        preapproval.api_preapproval_modify(callback_uri=self.test_uri)
+        preapproval.api_preapproval_cancel()
+
+        
+    def test_withdrawal(self):
+        """Tests calls: /withdrawal, /withdrawal/create, /withdrawal/modify"""
+        try:
+            withdrawal, response = self.account.api_withdrawal_create(
+                redirect_uri=self.test_uri, callback_uri=self.test_uri,
+                note="Short description, testing withdrawal create.", mode="iframe")
+        except WePayError, e:
+            self.assertEqual(e.code, 3005)
+            return
+        self.assertIsNotNone(withdrawal.redirect_uri)
+        self.assertIsNotNone(withdrawal.callback_uri)
+        self.assertIsNotNone(withdrawal.withdrawal_uri)
+        test_uri_modified = self.test_uri + "?modified=True"
+        withdrawal.api_withdrawal_modify(callback_uri=test_uri_modified)
+        self.assertEqual(
+            withdrawal.api.get_full_uri(test_uri_modified), withdrawal.callback_uri)
+
+
+    def test_credit_card(self):
+        cc, response = self.app.api_credit_card_create(
+            TEST_CC['number'], TEST_CC['cvv2'], TEST_CC['expMonth'], 
+            TEST_CC['expYear'], TEST_CC['nameOnCard'], 'test@example.com',
+            TEST_ADDRESS)
+        cc.api_credit_card()
+        self.assertEqual(cc.user_name, TEST_CC['nameOnCard'])
+        cc.api_credit_card_authorize()
+        cc.api_credit_card_delete()
+

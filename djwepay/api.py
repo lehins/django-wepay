@@ -72,10 +72,9 @@ class Api(object):
                                previous_state=previous_state)
         return response
 
-    def _api_uri_modifier(self, kwargs, name='callback_uri'):
+    def _api_uri_modifier(self, kwargs, name):
         if name in kwargs:
             uri = self.api.get_full_uri(kwargs[name])
-            setattr(self, name, uri)
             kwargs.update({
                 name: uri
             })
@@ -86,17 +85,6 @@ class Api(object):
         return self.api.get_full_uri(
             reverse('wepay:ipn', kwargs=kwargs))
 
-    def _api_property_getter(self, prop_name, getter=None, updater=None):
-        if getattr(self, prop_name, None) is None:
-            if not getter is None and callable(getter):
-                setattr(self, prop_name, getter(self))
-            elif not updater is None and callable(updater):
-                updater()
-            else:
-                raise ImproperlyConfigured(
-                    "Needs either getter or updater params as a callable")
-        return getattr(self, prop_name, None)
-
 class AppApi(Api):
 
     def api_app(self, **kwargs):
@@ -105,24 +93,24 @@ class AppApi(Api):
     def api_app_modify(self, **kwargs):
         return self._api_update(self.api.app_modify(**kwargs))
 
-    def api_oauth2_authorize(self, redirect_uri, **kwargs):
-        return self.api.oauth2_authorize(
-            self.api.get_full_uri(redirect_uri), **kwargs)
+    def api_oauth2_authorize(self, **kwargs):
+        self._api_uri_modifier(kwargs, 'redirect_uri')
+        return self.api.oauth2_authorize(**kwargs)
 
-    def api_oauth2_token(self, redirect_uri, code, **kwargs):
-        if not self._api_uri_modifier(kwargs):
+    def api_oauth2_token(self, **kwargs):
+        if not self._api_uri_modifier(kwargs, 'callback_uri'):
             kwargs['callback_uri'] = self._api_callback_uri(obj_name='user')
-        response = self.api.oauth2_token(
-            self.api.get_full_uri(redirect_uri), code, **kwargs)
+        self._api_uri_modifier(kwargs, 'redirect_uri')
+        response = self.api.oauth2_token( **kwargs)
         return self._api_create('user', response)
 
-    def api_preapproval_create(self, *args, **kwargs):
-        if not self._api_uri_modifier(kwargs):
+    def api_preapproval_create(self, **kwargs):
+        if not self._api_uri_modifier(kwargs, 'callback_uri'):
             kwargs['callback_uri'] = self._api_callback_uri(obj_name='preapproval')
-        self._api_uri_modifier(kwargs, name='redirect_uri')
-        self._api_uri_modifier(kwargs, name='fallback_uri')
+        self._api_uri_modifier(kwargs, 'redirect_uri')
+        self._api_uri_modifier(kwargs, 'fallback_uri')
         response = self.api.preapproval_create(
-            self.client_id, *args, access_token=self.client_secret, **kwargs)
+            account_id=self.client_id, access_token=self.client_secret, **kwargs)
         return self._api_create('preapproval', response)
 
     def api_preapproval_find(self, **kwargs):
@@ -144,17 +132,16 @@ class UserApi(Api):
             self.api.user(access_token=self.access_token, **kwargs))
 
     def api_user_modify(self, **kwargs):
-        self._api_uri_modifier(kwargs) # update relative callback_uri
+        self._api_uri_modifier(kwargs, 'callback_uri') # update relative callback_uri
         response = self._api_update(self.api.user_modify(
             access_token=self.access_token, **kwargs))
         return response
 
-    def api_account_create(self, *args, **kwargs):
-        if not self._api_uri_modifier(kwargs):
+    def api_account_create(self, **kwargs):
+        if not self._api_uri_modifier(kwargs, 'callback_uri'):
             kwargs['callback_uri'] = self._api_callback_uri(
                 obj_name='account', user_id=self.user_id)
-        response = self.api.account_create(
-            *args, access_token=self.access_token, **kwargs)
+        response = self.api.account_create(access_token=self.access_token, **kwargs)
         account, repsponse = self._api_create('account', response)
         account.user = self
         return (account, response)
@@ -206,7 +193,7 @@ class AccountApi(Api):
     def api_account(self, **kwargs):
         try:
             return self._api_update(self.api.account(
-                self.account_id, access_token=self.access_token, **kwargs))
+                account_id=self.pk, access_token=self.access_token, **kwargs))
         except WePayError, e:
             if e.code == 3003: # The account has been deleted
                 self.state = 'deleted'
@@ -214,62 +201,61 @@ class AccountApi(Api):
             raise
 
     def api_account_modify(self, **kwargs):
-        callback_uri = self._api_uri_modifier(kwargs)
-        image_uri = self._api_uri_modifier(kwargs, name='image_uri')
+        self._api_uri_modifier(kwargs, 'callback_uri')
+        self._api_uri_modifier(kwargs, 'image_uri')
         response = self._api_update(self.api.account_modify(
-            self.account_id, access_token=self.access_token, **kwargs))
-        if callback_uri or image_uri: # after the call is successfull, update model
-            self.save()
+            account_id=self.pk, access_token=self.access_token, **kwargs))
         return response
         
     def api_account_delete(self, **kwargs):
         response = self._api_update(self.api.account_delete(
-            self.account_id, access_token=self.access_token, **kwargs))
+            account_id=self.pk, access_token=self.access_token, **kwargs))
         self.save() # save deleted status right away
         return response
 
     def api_account_balance(self, **kwargs):
         return self._api_update(self.api.account_balance(
-            self.account_id, access_token=self.access_token, **kwargs))
+            account_id=self.pk, access_token=self.access_token, **kwargs))
         
     def api_account_add_bank(self, **kwargs):
-        self._api_uri_modifier(kwargs, name='redirect_uri')
+        self._api_uri_modifier(kwargs, 'redirect_uri')
         return self._api_update(self.api.account_add_bank(
-            self.account_id, access_token=self.access_token, **kwargs))
+            account_id=self.pk, access_token=self.access_token, **kwargs))
 
-    def api_account_set_tax(self, *args, **kwargs):
+    def api_account_set_tax(self, **kwargs):
         return self.api.account_set_tax(
-            self.account_id, *args, access_token=self.access_token, **kwargs)
+            account_id=self.pk, access_token=self.access_token, **kwargs)
 
     def api_account_get_tax(self, **kwargs):
         return self.api.account_get_tax(
-            self.account_id, access_token=self.access_token, **kwargs)
+            account_id=self.pk, access_token=self.access_token, **kwargs)
 
-    def _api_account_object_create(self, obj_name, *args, **kwargs):
-        if not self._api_uri_modifier(kwargs):
+    def _api_account_object_create(self, obj_name, **kwargs):
+        if not self._api_uri_modifier(kwargs, 'callback_uri'):
             kwargs['callback_uri'] = self._api_callback_uri(
                 obj_name=obj_name, user_id=self.user_id)
-        self._api_uri_modifier(kwargs, name='redirect_uri')
+        self._api_uri_modifier(kwargs, 'redirect_uri')
         method_create = getattr(self.api, "%s_create" % obj_name)
         response = method_create(
-            self.account_id, *args, access_token=self.access_token, **kwargs)
+            account_id=self.pk, access_token=self.access_token, **kwargs)
         obj, response = self._api_create(obj_name, response)
         obj.account = self
         return (obj, response)
 
 
-    def api_checkout_create(self, *args, **kwargs):
-        return self._api_account_object_create('checkout', *args, **kwargs)
+    def api_checkout_create(self, **kwargs):
+        return self._api_account_object_create('checkout', **kwargs)
 
-    def api_preapproval_create(self, *args,  **kwargs):
-        return self._api_account_object_create('preapproval', *args, **kwargs)
+    def api_preapproval_create(self, **kwargs):
+        self._api_uri_modifier(kwargs, 'fallback_uri')
+        return self._api_account_object_create('preapproval', **kwargs)
 
-    def api_withdrawal_create(self, *args,  **kwargs):
-        return self._api_account_object_create('withdrawal', *args, **kwargs)
+    def api_withdrawal_create(self,  **kwargs):
+        return self._api_account_object_create('withdrawal', **kwargs)
 
     def api_checkout_find(self, **kwargs):
         return self.api.checkout_find(
-            self.account_id, access_token=self.access_token, **kwargs)
+            account_id=self.pk, access_token=self.access_token, **kwargs)
 
     def api_preapproval_find(self, **kwargs):
         return self.api.preapproval_find(
@@ -277,7 +263,7 @@ class AccountApi(Api):
 
     def api_withdrawal_find(self, **kwargs):
         return self.api.withdrawal_find(
-            self.account_id, access_token=self.access_token, **kwargs)
+            account_id=self.pk, access_token=self.access_token, **kwargs)
 
 class CheckoutApi(Api):
 
@@ -299,24 +285,24 @@ class CheckoutApi(Api):
         
     def api_checkout(self, **kwargs):
         return self._api_update(self.api.checkout(
-            self.checkout_id, access_token=self.access_token, **kwargs))
+            checkout_id=self.pk, access_token=self.access_token, **kwargs))
 
-    def api_checkout_cancel(self, *args, **kwargs):
+    def api_checkout_cancel(self, **kwargs):
         return self._api_update(self.api.checkout_cancel(
-            self.checkout_id, *args, access_token=self.access_token, **kwargs))
+            checkout_id=self.pk, access_token=self.access_token, **kwargs))
 
-    def api_checkout_refund(self, *args, **kwargs):
+    def api_checkout_refund(self, **kwargs):
         return self._api_update(self.api.checkout_refund(
-            self.checkout_id, *args, access_token=self.access_token, **kwargs))
+            checkout_id=self.pk, access_token=self.access_token, **kwargs))
 
     def api_checkout_capture(self, **kwargs):
         return self._api_update(self.api.checkout_capture(
-            self.checkout_id, access_token=self.access_token, **kwargs))
+            checkout_id=self.pk, access_token=self.access_token, **kwargs))
 
     def api_checkout_modify(self, **kwargs):
-        self._api_uri_modifier(kwargs)
+        self._api_uri_modifier(kwargs, 'callback_uri')
         response = self._api_update(self.api.checkout_modify(
-            self.checkout_id, access_token=self.access_token, **kwargs))
+            checkout_id=self.pk, access_token=self.access_token, **kwargs))
         return response
 
 
@@ -345,16 +331,16 @@ class PreapprovalApi(Api):
 
     def api_preapproval(self, **kwargs):
         return self._api_update(self.api.preapproval(
-            self.pk, access_token=self.access_token, **kwargs))
+            preapproval_id=self.pk, access_token=self.access_token, **kwargs))
 
     def api_preapproval_cancel(self, **kwargs):
         return self._api_update(self.api.preapproval_cancel(
-            self.pk, access_token=self.access_token, **kwargs))
+            preapproval_id=self.pk, access_token=self.access_token, **kwargs))
 
     def api_preapproval_modify(self, **kwargs):
-        self._api_uri_modifier(kwargs)
+        self._api_uri_modifier(kwargs, 'callback_uri')
         response = self._api_update(self.api.preapproval_modify(
-            self.pk, access_token=self.access_token, **kwargs))
+            preapproval_id=self.pk, access_token=self.access_token, **kwargs))
         return response
 
 
@@ -379,21 +365,24 @@ class WithdrawalApi(Api):
 
     def api_withdrawal(self, **kwargs):
         return self._api_update(self.api.withdrawal(
-            self.pk, access_token=self.access_token, **kwargs))
+            withdrawal_id=self.pk, access_token=self.access_token, **kwargs))
 
     def api_withdrawal_modify(self, **kwargs):
-        self._api_uri_modifier(kwargs)
+        self._api_uri_modifier(kwargs, 'callback_uri')
         return self._api_update(self.api.withdrawal_modify(
-            self.pk, access_token=self.access_token, **kwargs))
+            withdrawal_id=self.pk, access_token=self.access_token, **kwargs))
         
 
 class CreditCardApi(Api):
     def api_credit_card(self, **kwargs):
-        return self._api_update(self.api.credit_card(self.pk, **kwargs))
+        return self._api_update(self.api.credit_card(
+            credit_card_id=self.pk, **kwargs))
 
     def api_credit_card_authorize(self, **kwargs):
-        return self._api_update(self.api.credit_card_authorize(self.pk, **kwargs))
+        return self._api_update(self.api.credit_card_authorize(
+            credit_card_id=self.pk, **kwargs))
 
     def api_credit_card_delete(self, **kwargs):
-        return self._api_update(self.api.credit_card_delete(self.pk, **kwargs))
+        return self._api_update(self.api.credit_card_delete(
+            credit_card_id=self.pk, **kwargs))
 
