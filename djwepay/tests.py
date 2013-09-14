@@ -10,7 +10,7 @@ from django.test.client import Client
 from django.test.utils import override_settings
 
 from djwepay.exceptions import WePayError
-from djwepay.models import *
+from djwepay.api import get_wepay_model
 from djwepay.signals import *
 
 TEST_LOGIN = getattr(settings, 'WEPAY_TESTS_LOGIN', '')
@@ -42,6 +42,14 @@ TEST_ADDRESS = {
     'state': ["NM"],
     'zip': "87108",
 }
+
+App = get_wepay_model('app')
+User = get_wepay_model('user')
+Account = get_wepay_model('account')
+Checkout = get_wepay_model('checkout')
+Preapproval = get_wepay_model('preapproval')
+Withdrawal = get_wepay_model('withdrawal')
+CreditCard = get_wepay_model('credit_card')
 
 
 
@@ -137,6 +145,7 @@ class WePayTestCase(TestCase):
         self._validate_equality(self.app, response)
         
     def test_oauth2(self):
+        """ Tests calls: /oauth2/authorize, /oauth2/token, /user/modify."""
         if TEST_LOGIN and TEST_PASSWORD:
             # get authentication url
             auth_url = self.app.api_oauth2_authorize(self.test_uri)
@@ -155,32 +164,23 @@ class WePayTestCase(TestCase):
             url = self.browser.response().geturl()
             self.assertTrue(url.startswith(self.app.api.get_full_uri(self.test_uri)))
             code = urlparse.parse_qs(urlparse.urlparse(url).query)['code'][0]
-            user, response = self.app.api_oauth2_token(
-                self.test_uri, code, callback_uri=self.test_uri)
+            user, response = self.app.api_oauth2_token(self.test_uri, code)
+            user.api_user_modify(callback_uri=self.test_uri)
+            self.assertEqual(TEST_LOGIN, user.email)
             self._validate_equality(user, response)
         else:
             print "Cannot test OAuth2 calls, set 'WEPAY_TESTS_LOGIN' and " \
                 "'WEPAY_TESTS_PASSWORD' constants in settings."
 
     def test_user(self):
-        #testing the getter
+        """Tests calls: /user, IPNs: User, signals:ipn_received, state_changed"""
         self.user.user_name = 'foo bar'
         self.user.first_name = 'foo'
         self.user.last_name = 'bar'
+        callback_uri = self.user.callback_uri or ''
         response = self.user.api_user()
         self.user.save()
         self._validate_equality(self.user, response)
-        #testing empty modifier 
-        self.user.api_user_modify()
-        # changing callback uri
-        self.user.api_user_modify(callback_uri=self.test_uri)
-        self.assertEqual(
-            self.app.api.get_full_uri(self.test_uri), self.user.callback_uri)
-        # changing to the correct one, just in case, and testing the result
-        self.user.api_user_modify(callback_uri=self.user.get_callback_uri())
-        self.assertEqual(
-            self.app.api.get_full_uri(reverse('wepay:ipn:user')), 
-            self.user.callback_uri)
         # testing IPN and signals
         correct_state = self.user.state
         incorrect_state = 'pending' if correct_state == 'registered' else 'registered'
@@ -191,24 +191,26 @@ class WePayTestCase(TestCase):
         def ipn_tester(instance, **kwargs):
             signals_received.update({'ipn_processed': True})
             self.assertEqual(instance.state, correct_state)
-            print "User 'ipn_processed' signal tested: %s" % instance.user_name
         ipn_processed.connect(ipn_tester, sender=User, weak=False)
         def state_tester(instance, previous_state, **kwargs):
             signals_received.update({'state_changed': True})
             self.assertEqual(instance.state, correct_state)
             self.assertEqual(previous_state, incorrect_state)
-            print "User 'state_changed' signal tested: %s" % instance.user_name
         state_changed.connect(state_tester, sender=User, weak=False)
         self.user.state = incorrect_state
         self.user.save()
         # imitate IPN
         response = self.client.post(
-            self.user.get_callback_uri(), {'user_id': self.user.pk})
+            reverse('wepay:ipn', kwargs={'obj_name':'user'}), 
+            {'user_id': self.user.pk})
         self.assertEqual(response.status_code, 200)
         self.assertTrue(signals_received['ipn_processed'])
         self.assertTrue(signals_received['state_changed'])
 
     def test_account(self):
+        """Tests calls: /account/create, /account/modify, /account/add_bank
+        /account/set_tax, /account/get_tax, /account/balance, /account/delete
+        """
         name = "Runtime Test Account"
         acc, response = self.user.api_account_create(
             name, "Account created during running of the "
@@ -221,13 +223,18 @@ class WePayTestCase(TestCase):
         self.assertIsNotNone(acc.verification_uri)
         self._validate_equality(acc, response)
         self.assertEqual(
-            acc.api.get_full_uri(
-                reverse('wepay:ipn:account', kwargs={'user_id':self.user.pk})),
+            acc.api.get_full_uri(reverse(
+                'wepay:ipn', kwargs={'obj_name':'account', 'user_id':self.user.pk})),
             acc.callback_uri)
         name_modified = name + " - Modified"
-        acc.api_account_modify(name=name_modified, callback_uri=self.test_uri)
-        acc.save()
+        acc.api_account_modify(
+            name=name_modified, description="description modified", 
+            reference_id=self._reference_id(), callback_uri=self.test_uri, 
+            image_uri='http://www.placekitten.com/450/450',
+            gaq_domains=TEST_GAQ_DOMAINS, theme_object=TEST_THEME
+        )
         self.assertEqual(acc.api.get_full_uri(self.test_uri), acc.callback_uri)
+
         self.assertEqual(name_modified, acc.name)
 
         self.assertIsNotNone(acc.pending_balance)
@@ -235,7 +242,6 @@ class WePayTestCase(TestCase):
         self.assertIsNotNone(acc.pending_amount)
         self.assertIsNotNone(acc.reserved_amount)
         self.assertIsNotNone(acc.disputed_amount)
-        self.assertIsNotNone(acc.currency)
         
         response = acc.api_account_add_bank(mode='iframe', redirect_uri=self.test_uri)
         self._validate_equality(acc, response)
