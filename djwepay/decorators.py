@@ -15,11 +15,12 @@ class batchable(object):
         return self.__class__(self._func.__get__(obj, type))
 
     def __call__(self, *args, **kwargs):
+        kwargs.pop('batch_mode', None)
         return self._func(*args, **kwargs)
 
-    def batch(self, batch_id, reference_id=None, parameters=((), {})):
-        args, kwargs = parameters
-        call = self._func(*args, batch_mode=True, **kwargs)
+    def batch(self, batch_id, reference_id=None, kwargs={}):
+        kwargs.pop('batch_mode', None)
+        call = self._func(batch_mode=True, **kwargs)
         if not reference_id is None:
             call['reference_id'] = None
         batch_key = make_batch_key(batch_id)

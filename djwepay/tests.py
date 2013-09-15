@@ -1,4 +1,4 @@
-import cookielib, mechanize, urllib, urllib2, urlparse, random, time
+import cookielib, mechanize, urllib, urllib2, urlparse, random, time, warnings
 from decimal import Decimal
 
 from django.conf import settings
@@ -9,9 +9,9 @@ from django.test import TestCase
 from django.test.client import Client
 from django.test.utils import override_settings
 
-from djwepay.exceptions import WePayError
 from djwepay.api import get_wepay_model
 from djwepay.signals import *
+from wepay.exceptions import WePayError
 
 TEST_LOGIN = getattr(settings, 'WEPAY_TESTS_LOGIN', '')
 TEST_PASSWORD = getattr(settings, 'WEPAY_TESTS_PASSWORD', '')
@@ -281,6 +281,7 @@ class WePayTestCase(TestCase):
         try:
             checkout.api_checkout_capture()
         except WePayError, e:
+            self.assertTrue(str(e).rfind("4004") >= 0)
             self.assertEqual(e.code, 4004)
         try:
             checkout.api_checkout_refund(refund_reason="test refund reason")
@@ -360,6 +361,60 @@ class WePayTestCase(TestCase):
             TEST_ADDRESS)
         cc.api_credit_card()
         self.assertEqual(cc.user_name, TEST_CC['nameOnCard'])
-        cc.api_credit_card_authorize()
+        try:
+            cc.api_credit_card_authorize()
+        except WePayError, e:
+            self.assertEqual(e.code, 2009)
         cc.api_credit_card_delete()
 
+    def test_flow(self):
+        ccs = [c for c in self.app.api_credit_card_find() 
+               if c['state'] == 'authorized']
+        if len(ccs) > 0:
+            try:
+                cc = CreditCard.objects.get(
+                    pk=ccs[0]['credit_card_id'])
+            except CreditCard.DoesNotExist:
+                cc = CreditCard.objects.create(**ccs[0])
+        else:
+            cc, r = self.app.api_credit_card_create(
+                TEST_CC['number'], TEST_CC['cvv2'], TEST_CC['expMonth'], 
+                TEST_CC['expYear'], TEST_CC['nameOnCard'], 'test@example.com',
+                TEST_ADDRESS)
+            cc.api_credit_card()
+            cc.save()
+        pas = self.account.api_preapproval_find(state="approved", limit=5)
+        if len(pas) > 0:
+            try:
+                pa = Preapproval.objects.get(pk=pas[0]['preapproval_id'])
+            except Preapproval.DoesNotExist:
+                pa = Preapproval()
+                pa._api_update(pas[0])
+                pa.save()
+        else:
+            pa, r = self.account.api_preapproval_create(
+                amount=5000, short_description="testing charge with cc app wise",
+                period="daily", frequency=24, 
+                payment_method_id=cc.pk, payment_method_type='credit_card')
+        try:
+            co, r = self.account.api_checkout_create(
+                short_description="testing flow of wepay-django", type="GOODS",
+                amount=100, preapproval_id=pa.pk)
+        except WePayError, e: # in case if cannot charge using this preapproval
+            self.assertEqual(e.code, 1008) 
+
+        if self.account.available_balance > 0:
+            wd, r = self.account.api_withdrawal_create(
+                redirect_uri=self.test_uri, callback_uri=self.test_uri,
+                note="Short description, testing withdrawal create.", mode="iframe")
+            wd.api_withdrawal_modify(callback_uri=self.test_uri)
+            self.assertIsNotNone(wd.redirect_uri)
+            self.assertIsNotNone(wd.callback_uri)
+            self.assertIsNotNone(wd.withdrawal_uri)
+
+    def test_batch(self):
+        batch_id=1234
+        self.app.api.credit_card_find.batch(batch_id, kwargs={'limit':2})
+        self.app.api.preapproval_find.batch(batch_id, kwargs={'limit':2})
+        response = self.app.api.batch_create(batch_id)
+        self.assertEqual(len(response['calls']), 2)

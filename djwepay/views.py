@@ -5,9 +5,9 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.generic.base import View
 
 from djwepay.models import User
-from djwepay.exceptions import WePayError
 from djwepay.signals import ipn_processed
 from djwepay.api import get_wepay_model
+from wepay.exceptions import WePayError
 
 __all__ = ['IPNView', 'TestsCallbackView']
 

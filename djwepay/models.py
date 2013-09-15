@@ -170,9 +170,9 @@ class Preapproval(PreapprovalApi, BaseModel):
     state = models.CharField(max_length=255)
     app_fee = MoneyField()
     period = models.CharField(max_length=255)
-    frequency = models.IntegerField()
-    start_time = models.BigIntegerField()
-    end_time = models.BigIntegerField()
+    frequency = models.IntegerField(null=True)
+    start_time = models.BigIntegerField(null=True)
+    end_time = models.BigIntegerField(null=True)
     reference_id = models.CharField(max_length=255)
     shipping_address = JSONField(null=True)
     shipping_fee = MoneyField(null=True)
@@ -180,8 +180,8 @@ class Preapproval(PreapprovalApi, BaseModel):
     auto_recur = models.BooleanField()
     payer_name = models.CharField(max_length=255)
     payer_email = models.EmailField(max_length=255, blank=True)
-    create_time = models.BigIntegerField()
-    next_due_time = models.BigIntegerField()
+    create_time = models.BigIntegerField(null=True)
+    next_due_time = models.BigIntegerField(null=True)
     last_checkout = models.ForeignKey(
         get_wepay_model_name('checkout'), null=True, related_name='+')
     last_checkout_time = models.BigIntegerField(null=True)
@@ -222,6 +222,7 @@ class CreditCard(CreditCardApi, BaseModel):
     user_name = models.CharField(max_length=255)
     email = models.CharField(max_length=255, blank=True)
     reference_id = models.CharField(max_length=255, blank=True)
+    create_time = models.BigIntegerField(null=True)
 
     def __str__(self):
         return self.credit_card_name

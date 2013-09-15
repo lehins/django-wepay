@@ -5,9 +5,9 @@ from django.db.models.loading import get_model
 from django.utils.functional import LazyObject
 
 from djwepay.decorators import cached_property
-from djwepay.exceptions import WePayError
 from djwepay.signals import state_changed
 from djwepay.utils import from_string_import
+from wepay.exceptions import WePayError
 
 __all__ = ['AppApi', 'UserApi', 'AccountApi', 'CheckoutApi', 'PreapprovalApi',
            'WithdrawalApi', 'CreditCardApi', 
@@ -236,6 +236,7 @@ class AccountApi(Api):
                 obj_name=obj_name, user_id=self.user_id)
         self._api_uri_modifier(kwargs, 'redirect_uri')
         method_create = getattr(self.api, "%s_create" % obj_name)
+        #access_token = kwargs.get('access_token', None) or self.access_token
         response = method_create(
             account_id=self.pk, access_token=self.access_token, **kwargs)
         obj, response = self._api_create(obj_name, response)
@@ -350,15 +351,15 @@ class WithdrawalApi(Api):
     def access_token(self):
         return self.account.access_token
 
-    @property
+    @cached_property
     def withdrawal_uri(self):
         return self.api_withdrawal().get('withdrawal_uri', None)
 
-    @property
+    @cached_property
     def redirect_uri(self):
         return self.api_withdrawal().get('redirect_uri', None)
 
-    @property
+    @cached_property
     def callback_uri(self):
         return self.api_withdrawal().get('callback_uri', None)
 

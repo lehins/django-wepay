@@ -1,14 +1,17 @@
-import time
+import time, logging, warnings
 from django.conf import settings
 from django.contrib.sites.models import Site
 from django.core.cache import cache
 
-from wepay import WePay as PythonWePay
 from djwepay.decorators import batchable, CACHE_BATCH_TIMEOUT
 from djwepay.utils import make_batch_key
+from wepay import WePay as PythonWePay
+from wepay.exceptions import WePayError
 
 
 __all__ = ['WePay']
+
+DEBUG = getattr(settings, 'WEPAY_DEBUG', False)
 
 # default is full access
 DEFAULT_SCOPE = getattr(
@@ -26,33 +29,53 @@ class WePay(PythonWePay):
     def __init__(self, app):
         self._app = app
         self.site_uri = "https://%s" % str(Site.objects.get_current())
-        super(WePay, self).__init__(
-            production=self._app.production, access_token=self._app.access_token)
+        super(WePay, self).__init__(production=self._app.production, 
+                                    access_token=self._app.access_token, timeout=45)
 
-    def call(self, *args, **kwargs):
-        if THROTTLE_PROTECT:
-            # TODO add a logger and a notifier
-            blocked = cache.add(BLOCKING_KEY, True)
-            if not blocked:
-                time.sleep(1)
-                return self.call(*args, **kwargs)
-            now = int(time.time())
-            unexpired_timestamp = now - THROTTLE_TIMEOUT
-            unexpired_calls = [x for x in cache.get(THROTTLE_CALL_KEY, [])
-                               if x >= unexpired_timestamp]
-            if len(unexpired_calls) >= THROTTLE_CALL_LIMIT:
-                cache.delete(BLOCKING_KEY)
-                sleep_time = THROTTLE_TIMEOUT + unexpired_calls[0] - now + 1
-                time.sleep(sleep_time)
-                return self.call(*args, **kwargs)
-            else:
-                unexpired_calls.append(now)
-                cache.set(
-                    THROTTLE_CALL_KEY, unexpired_calls, THROTTLE_TIMEOUT)
-                cache.delete(BLOCKING_KEY)
-                return super(WePay, self).call(*args, **kwargs)
+    def _log_error(self, error, uri, params):
+        logger = logging.getLogger('djwepay.api.error')
+        logger.error("\nCall: '%s' with params: '%s' produced an error: '%s'"
+                           "\n%s" % (uri, params, error, '='*70))
+        
+    def _log_debug(self, uri, params, response):
+        logger = logging.getLogger('djwepay.api.debug')
+        logger.debug(
+            "\nCall: '%s' was placed with params: '%s' and received a response: "
+            "'%s'\n%s" % (uri, params, response, '='*70))
+
+    def _call_protected(self, uri, **kwargs):
+        blocked = cache.add(BLOCKING_KEY, True)
+        if not blocked:
+            time.sleep(1)
+            return self._call_protected(uri, **kwargs)
+        now = int(time.time())
+        unexpired_timestamp = now - THROTTLE_TIMEOUT
+        unexpired_calls = [x for x in cache.get(THROTTLE_CALL_KEY, [])
+                           if x >= unexpired_timestamp]
+        if len(unexpired_calls) >= THROTTLE_CALL_LIMIT:
+            cache.delete(BLOCKING_KEY)
+            sleep_time = THROTTLE_TIMEOUT + unexpired_calls[0] - now + 1
+            time.sleep(sleep_time)
+            return self._call_protected(uri, **kwargs)
         else:
-            return super(WePay, self).call(*args, **kwargs)
+            unexpired_calls.append(now)
+            cache.set(
+                THROTTLE_CALL_KEY, unexpired_calls, THROTTLE_TIMEOUT)
+            cache.delete(BLOCKING_KEY)
+            return super(WePay, self).call(uri, **kwargs)
+
+    def call(self, uri, **kwargs):
+        try:
+            if THROTTLE_PROTECT:
+                response = self._call_protected(uri, **kwargs)
+            else:
+                response = super(WePay, self).call(uri, **kwargs)
+        except WePayError, e:
+            self._log_error(e, uri, kwargs.get('params', {}))
+            raise
+        if DEBUG:
+            self._log_debug(uri, kwargs.get('params', {}), response)
+        return response
 
     def get_full_uri(self, uri):
         """
