@@ -3,6 +3,7 @@ from django.conf import settings
 from django.contrib.sites.models import Site
 from django.core.cache import cache
 
+from djwepay.api import DEFAULT_SCOPE
 from djwepay.decorators import batchable, CACHE_BATCH_TIMEOUT
 from djwepay.utils import make_batch_key
 from wepay import WePay as PythonWePay
@@ -12,11 +13,6 @@ from wepay.exceptions import WePayError
 __all__ = ['WePay']
 
 DEBUG = getattr(settings, 'WEPAY_DEBUG', False)
-
-# default is full access
-DEFAULT_SCOPE = getattr(
-    settings, 'WEPAY_DEFAULT_SCOPE', "manage_accounts,collect_payments,"
-    "view_balance,view_user,preapprove_payments,send_money")
 
 THROTTLE_PROTECT = getattr(settings, 'WEPAY_THROTTLE_PROTECT', False)
 THROTTLE_CALL_LIMIT = getattr(settings, 'WEPAY_THROTTLE_CALL_LIMIT', 30)

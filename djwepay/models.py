@@ -1,3 +1,4 @@
+import datetime
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.db import models
@@ -15,6 +16,13 @@ APP_CACHE = {}
 class BaseModel(models.Model):
     date_created  = models.DateTimeField(auto_now_add=True)
     date_modified = models.DateTimeField(auto_now=True)
+
+    def save(self, *args, **kwargs):
+        ''' On save, update timestamps '''
+        if not self.date_created:
+            self.date_created = datetime.datetime.today()
+        self.date_modified = datetime.datetime.today()
+        return super(BaseModel, self).save(*args, **kwargs)
 
     class Meta:
         abstract = True
@@ -57,8 +65,8 @@ class App(AppApi, BaseModel):
     """
     client_id = models.BigIntegerField(primary_key=True)
     status = models.CharField(max_length=255)
-    theme_object = JSONField()
-    gaq_domains = JSONField()
+    theme_object = JSONField(null=True, blank=True)
+    gaq_domains = JSONField(null=True, blank=True)
 
     client_secret = models.CharField(max_length=255)
     access_token = models.CharField(max_length=255)
@@ -73,7 +81,7 @@ class App(AppApi, BaseModel):
 
 class UserManager(models.Manager):
     
-    def active(self):
+    def accessible(self):
         return self.exclude(access_token=None)
 
 class User(UserApi, BaseModel):
@@ -99,21 +107,29 @@ class User(UserApi, BaseModel):
         db_table = 'djwepay_user'
         verbose_name = 'WePay User'
 
+class AccountManager(models.Manager):
+    
+    def accessible(self):
+        return self.exclude(user__access_token=None)
+
+    def active(self):
+        return self.accessible().exclude(state='deleted')
 
 class Account(AccountApi, BaseModel):
     account_id = models.BigIntegerField(primary_key=True)
-    user = models.ForeignKey(get_wepay_model_name('user'))
+    user = models.ForeignKey(get_wepay_model_name('user'), related_name='accounts')
     name = models.CharField(max_length=255)
     state = models.CharField(max_length=255)
     description = models.CharField(max_length=255)
     reference_id = models.CharField(max_length=255)
     payment_limit = MoneyField(null=True)
-    gaq_domains = JSONField()
-    theme_object = JSONField()
+    gaq_domains = JSONField(null=True, blank=True)
+    theme_object = JSONField(null=True, blank=True)
     verification_state = models.CharField(max_length=255)
     type = models.CharField(max_length=255)
-    create_time = models.BigIntegerField()
+    create_time = models.BigIntegerField(null=True)
 
+    objects = AccountManager()
     
     def __str__(self):
         return "%s - %s" % (self.pk, self.name)
@@ -123,11 +139,18 @@ class Account(AccountApi, BaseModel):
         db_table = 'djwepay_account'
         verbose_name = 'WePay Account'
 
+class AccountObjectsManager(models.Manager):
+    
+    def accessible(self):
+        return self.exclude(account__user__access_token=None)
+
 
 class Checkout(CheckoutApi, BaseModel):
     checkout_id = models.BigIntegerField(primary_key=True)
-    account = models.ForeignKey(get_wepay_model_name('account'))
-    preapproval = models.ForeignKey(get_wepay_model_name('preapproval'), null=True)
+    account = models.ForeignKey(
+        get_wepay_model_name('account'), related_name='checkouts')
+    preapproval = models.ForeignKey(
+        get_wepay_model_name('preapproval'), related_name='checkouts', null=True)
     state = models.CharField(max_length=255)
     short_description = models.CharField(max_length=255)
     long_description = models.CharField(max_length=2047, blank=True)
@@ -147,8 +170,10 @@ class Checkout(CheckoutApi, BaseModel):
     shipping_address = JSONField(null=True)
     tax = MoneyField(null=True)
     amount_refunded = MoneyField(null=True)
-    create_time = models.BigIntegerField()
+    create_time = models.BigIntegerField(null=True)
     mode = models.CharField(max_length=255)
+
+    objects = AccountObjectsManager()
 
     def __str__(self):
         return "%s - %s" % (self.pk, self.short_description)
@@ -161,14 +186,15 @@ class Checkout(CheckoutApi, BaseModel):
 
 class Preapproval(PreapprovalApi, BaseModel):
     preapproval_id = models.BigIntegerField(primary_key=True)
-    account = models.ForeignKey(get_wepay_model_name('account'))
+    account = models.ForeignKey(
+        get_wepay_model_name('account'), related_name='preapprovals')
     short_description = models.CharField(max_length=255)
     long_description = models.CharField(max_length=2047, blank=True)
     currency = "USD"
-    amount = MoneyField()
+    amount = MoneyField(null=True)
     fee_payer = models.CharField(max_length=255)
     state = models.CharField(max_length=255)
-    app_fee = MoneyField()
+    app_fee = MoneyField(null=True)
     period = models.CharField(max_length=255)
     frequency = models.IntegerField(null=True)
     start_time = models.BigIntegerField(null=True)
@@ -177,7 +203,7 @@ class Preapproval(PreapprovalApi, BaseModel):
     shipping_address = JSONField(null=True)
     shipping_fee = MoneyField(null=True)
     tax = MoneyField(null=True)
-    auto_recur = models.BooleanField()
+    auto_recur = models.BooleanField(default=False)
     payer_name = models.CharField(max_length=255)
     payer_email = models.EmailField(max_length=255, blank=True)
     create_time = models.BigIntegerField(null=True)
@@ -186,6 +212,8 @@ class Preapproval(PreapprovalApi, BaseModel):
         get_wepay_model_name('checkout'), null=True, related_name='+')
     last_checkout_time = models.BigIntegerField(null=True)
     mode = models.CharField(max_length=255)
+
+    objects = AccountObjectsManager()
 
     def __str__(self):
         return "%s - %s" % (self.pk, self.short_description)
@@ -198,13 +226,16 @@ class Preapproval(PreapprovalApi, BaseModel):
 
 class Withdrawal(WithdrawalApi, BaseModel):
     withdrawal_id = models.BigIntegerField(primary_key=True)
-    account = models.ForeignKey(get_wepay_model_name('account'))
+    account = models.ForeignKey(
+        get_wepay_model_name('account'), related_name='withdrawals')
     state = models.CharField(max_length=255)
     amount = MoneyField(null=True)
     note = models.CharField(max_length=255)
     recipient_confirmed = models.NullBooleanField()
     type = models.CharField(max_length=255)
-    create_time = models.BigIntegerField()
+    create_time = models.BigIntegerField(null=True)
+
+    objects = AccountObjectsManager()
 
     def __str__(self):
         return "%s - %s" % (self.pk, self.amount)

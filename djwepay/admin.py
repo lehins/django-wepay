@@ -1,12 +1,17 @@
 from django.contrib import admin
 
 from djwepay.api import get_wepay_model, is_abstract
+from djwepay.forms import AppForm
+
+__all__ = ['AppAdmin', 'UserAdmin', 'AccountAdmin']
 
 class AppAdmin(admin.ModelAdmin):
     list_display = ('client_id', 'status', 'production')
     list_filter = ('status', 'production', 'date_created')
     readonly_fields = ('status', 'date_created', 'date_modified')
     search_fields = ('status', 'theme_object', 'gaq_domain')
+
+    form = AppForm
 
 if not is_abstract('app'):
     admin.site.register(get_wepay_model('app'), AppAdmin)

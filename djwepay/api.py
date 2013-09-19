@@ -10,8 +10,13 @@ from djwepay.utils import from_string_import
 from wepay.exceptions import WePayError
 
 __all__ = ['AppApi', 'UserApi', 'AccountApi', 'CheckoutApi', 'PreapprovalApi',
-           'WithdrawalApi', 'CreditCardApi', 
+           'WithdrawalApi', 'CreditCardApi', 'DEFAULT_SCOPE', 
            'get_wepay_model', 'get_wepay_model_name', 'is_abstract']
+
+# default is full access
+DEFAULT_SCOPE = getattr(
+    settings, 'WEPAY_DEFAULT_SCOPE', "manage_accounts,collect_payments,"
+    "view_balance,view_user,preapprove_payments,send_money")
 
 DEFAULT_MODELS = (
     ('app', 'djwepay.App'),
@@ -138,6 +143,7 @@ class UserApi(Api):
         return response
 
     def api_account_create(self, **kwargs):
+        self._api_uri_modifier(kwargs, 'image_uri')
         if not self._api_uri_modifier(kwargs, 'callback_uri'):
             kwargs['callback_uri'] = self._api_callback_uri(
                 obj_name='account', user_id=self.user_id)
