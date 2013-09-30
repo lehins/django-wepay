@@ -76,7 +76,7 @@ class Api(object):
         if new_state and new_state != previous_state:
             # using cache we eliminate duplicate calls to state_changed,
             # which has a chance of happening in multithreaded environment
-            cache_key = "state_changed_%s_%s" % (type(self), self.pk)
+            cache_key = "state_changed_%s_%s" % (type(self).__name__, self.pk)
             added = cache.add(cache_key, new_state)
             if not added:
                 stored_state = cache.get(cache_key)
