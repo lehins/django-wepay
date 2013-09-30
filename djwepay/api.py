@@ -82,7 +82,7 @@ class Api(object):
                 stored_state = cache.get(cache_key)
                 if stored_state == new_state:
                     return response
-            added = cache.set(cache_key, new_state)                
+            cache.set(cache_key, new_state)                
             state_changed.send(sender=type(self), instance=self, 
                                previous_state=previous_state)
         return response

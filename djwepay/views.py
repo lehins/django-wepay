@@ -18,18 +18,15 @@ class IPNView(View):
     def dispatch(self, *args, **kwargs):
         return super(IPNView, self).dispatch(*args, **kwargs)
 
-    def post(self, request, **kwargs):
-        obj_name = kwargs.get('obj_name')
+    def post(self, request, obj_name=None, user_id=None, **kwargs):
         model = get_wepay_model(obj_name)
         obj_id_name = "%s_id" % obj_name
         user = None
-        user_id = kwargs.get('user_id', None)
         try:
             obj_id = request.POST[obj_id_name]
         except KeyError:
             return HttpResponse(
-                "Not recognized or not implemented object IPN. %s" % 
-                obj_id_name, status=501)
+                "Missing object_id in POST: %s" % obj_id_name, status=501)
         try:
             obj = model.objects.get(pk=obj_id)
         except model.DoesNotExist:
