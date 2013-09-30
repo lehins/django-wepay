@@ -3,7 +3,6 @@ import copy
 from django.template.base import Node, token_kwargs, TemplateSyntaxError
 from django.template.defaulttags import register
 from django.utils import six
-from django.utils.html import format_html
 
 from djwepay.api import get_wepay_model, DEFAULT_SCOPE
 
@@ -12,7 +11,7 @@ APP = get_wepay_model('app').objects.get_current()
 class AuthorizeNode(Node):
     template = '<script src="%(browser_js)s" ' \
                'type="text/javascript"></script><script type="text/javascript">' \
-               'window.onload = function(){'\
+               'function oauth2_authorize(){'\
                'WePay.set_endpoint("%(endpoint)s"); ' \
                'WePay.OAuth2.button_init(document.getElementById("%(elem_id)s"), {' \
                '"client_id": "%(client_id)d",' \
@@ -23,7 +22,11 @@ class AuthorizeNode(Node):
                '"top": %(top)d,' \
                '"left": %(left)d,' \
                '"state": "%(state)s",' \
-               '"callback": %(callback)s });};</script>' \
+               '"callback": %(callback)s });}' \
+               'if(window.addEventListener)' \
+               'window.addEventListener("load", oauth2_authorize);' \
+               'else window.attachEvent("onload", oauth2_authorize);' \
+               '</script>' \
 
     default_params = {
         'browser_js': APP.api.browser_js,

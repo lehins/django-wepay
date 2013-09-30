@@ -271,7 +271,12 @@ class WePay(PythonWePay):
             self._app.client_id, self._app.client_secret, credit_card_id, **kwargs)
 
     @batchable
-    def credit_card_create(self, *args, **kwargs):
+    def credit_card_create(self, **kwargs):
+        names = [
+            'client_id', 'cc_number', 'cvv', 'expiration_month', 'expiration_year',
+            'user_name', 'email', 'address'
+        ]
+        args = [kwargs.pop(x) for x in names]
         return super(WePay, self).credit_card_create(
             self._app.client_id, *args, **kwargs)
 
@@ -299,9 +304,9 @@ class WePay(PythonWePay):
         calls_response = []
         while calls:
             cur_calls = calls[:50]
-            cache.set(batch_key, calls[50:], CACHE_BATCH_TIMEOUT)
             response = super(WePay, self).batch_create(
                 self._app.client_id, self._app.client_secret, calls, **kwargs)
+            cache.set(batch_key, calls[50:], CACHE_BATCH_TIMEOUT)
             calls_response.extend(response['calls'])
             calls = cache.get(batch_key)            
         return {'calls': calls_response}

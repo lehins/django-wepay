@@ -73,6 +73,15 @@ class Api(object):
         for key, value in response.iteritems():
             setattr(self, key, value)
         if new_state and new_state != previous_state:
+            # using cache we eliminate duplicate calls to state_changed,
+            # which has a chance of happening in multithreaded environment
+            cache_key = "state_changed_%s_%s" % (type(self), self.pk)
+            added = cache.add(cache_key, new_state)
+            if not added:
+                stored_state = cache.get(cache_key)
+                if stored_state == new_state:
+                    return response
+            added = cache.set(cache_key, new_state)                
             state_changed.send(sender=type(self), instance=self, 
                                previous_state=previous_state)
         return response
@@ -89,8 +98,12 @@ class Api(object):
     def _api_callback_uri(self, **kwargs):
         return self.api.get_full_uri(
             reverse('wepay:ipn', kwargs=kwargs))
+    
+    def api_batch_create(self, *args, **kwargs):
+        return self.api.batch_create(*args, **kwargs)
 
 class AppApi(Api):
+    """ App model mixin object that helps making related Api calls"""
 
     def api_app(self, **kwargs):
         return self._api_update(self.api.app(**kwargs))
@@ -99,6 +112,9 @@ class AppApi(Api):
         return self._api_update(self.api.app_modify(**kwargs))
 
     def api_oauth2_authorize(self, **kwargs):
+        """
+        Returns url where user can be send off to in order to grant access.
+        """
         self._api_uri_modifier(kwargs, 'redirect_uri')
         return self.api.oauth2_authorize(**kwargs)
 
@@ -115,7 +131,7 @@ class AppApi(Api):
         self._api_uri_modifier(kwargs, 'redirect_uri')
         self._api_uri_modifier(kwargs, 'fallback_uri')
         response = self.api.preapproval_create(
-            account_id=self.client_id, access_token=self.client_secret, **kwargs)
+            client_id=self.client_id, client_secret=self.client_secret, **kwargs)
         return self._api_create('preapproval', response)
 
     def api_preapproval_find(self, **kwargs):
@@ -172,7 +188,7 @@ class AccountApi(Api):
 
     @cached_property
     def add_bank_uri(self):
-        return self.api_account_add_bank().get('account_uri', None)
+        return self.api_account_add_bank().get('add_bank_uri', None)
 
     @cached_property
     def pending_balance(self):
@@ -242,7 +258,6 @@ class AccountApi(Api):
                 obj_name=obj_name, user_id=self.user_id)
         self._api_uri_modifier(kwargs, 'redirect_uri')
         method_create = getattr(self.api, "%s_create" % obj_name)
-        #access_token = kwargs.get('access_token', None) or self.access_token
         response = method_create(
             account_id=self.pk, access_token=self.access_token, **kwargs)
         obj, response = self._api_create(obj_name, response)

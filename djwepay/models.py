@@ -1,3 +1,15 @@
+"""All models are direct mappings to the WePay objects. By default only the
+fields that correspond to the values returned from WePay lookup calls
+(ex. `/account <https://www.wepay.com/developer/reference/account#lookup>`_) are
+include in the models. All fields follow the rules outlined in `Storing Data
+<https://www.wepay.com/developer/reference/storing_data>`_, unless otherwise
+specified in object's documentation. For that reason values, which have there
+names end with '_uri' (ex. ``account_uri``) are not included as model fields,
+instead they are added as dynamic cached object properties, which are inherited
+from Api objects defined in :mod:`djwepay.api`.
+
+"""
+
 import datetime
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
@@ -10,6 +22,7 @@ from json_field import JSONField
 
 __all__ = ['App', 'User', 'Account', 'Checkout', 'Preapproval', 'Withdrawal', 
            'CreditCard']
+
 
 APP_CACHE = {}
 
@@ -31,17 +44,17 @@ class BaseModel(models.Model):
 class AppManager(models.Manager):
 
     def get_current(self):
-        """
-        Returns the current ``App`` based on the ``WEPAY_APP_ID`` in the
-        project's settings. The ``App`` object is cached the first
-        time it's retrieved from the database.
+        """Returns the current :class:`App` based on the :ref:`WEPAY_APP_ID` in the
+        project's settings. The :class:`App` object is cached the first time
+        it's retrieved from the database.
+
         """
         try:
             app_id = settings.WEPAY_APP_ID
         except AttributeError:
             raise ImproperlyConfigured(
                 "You're using the Django WePay application without having set the "
-                "WEPAY_APP_ID setting. Create a site in your database and set the "
+                "WEPAY_APP_ID setting. Create an app in your database and set the "
                 "WEPAY_APP_ID setting to fix this error.")
         try:
             current_app = APP_CACHE[app_id]
@@ -55,13 +68,11 @@ class AppManager(models.Manager):
         global APP_CACHE
         APP_CACHE = {}
 
-
 class App(AppApi, BaseModel):
     """
-    Due to the fact that mostly only a single app will be used with a django instance
-    App model is abstract and is here for pure consistency with a mapping of 
-    WePay objects to django models. If necessary can be extended as a concrete model
-    and it might be converted to a concrete model in future.
+    This model stores all of the relevant WePay application information. Only one
+    instance of it at a time is supported per django application, which is 
+    controlled by :ref:`WEPAY_APP_ID` setting.
     """
     client_id = models.BigIntegerField(primary_key=True)
     status = models.CharField(max_length=255)
@@ -152,6 +163,7 @@ class Checkout(CheckoutApi, BaseModel):
     preapproval = models.ForeignKey(
         get_wepay_model_name('preapproval'), related_name='checkouts', null=True)
     state = models.CharField(max_length=255)
+    soft_descriptor = models.CharField(max_length=255)
     short_description = models.CharField(max_length=255)
     long_description = models.CharField(max_length=2047, blank=True)
     currency = "USD"

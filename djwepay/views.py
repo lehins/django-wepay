@@ -9,7 +9,7 @@ from djwepay.signals import ipn_processed
 from djwepay.api import get_wepay_model
 from wepay.exceptions import WePayError
 
-__all__ = ['IPNView', 'TestsCallbackView']
+__all__ = ['IPNView', 'OAuth2Mixin', 'TestsCallbackView']
 
 class IPNView(View):
     http_method_names = ['post']
@@ -54,6 +54,84 @@ class IPNView(View):
         return HttpResponse("Successfull object update.")
         
 
+class OAuth2Mixin(object):
+    """
+    Mixin for Django generic style views that is helpfull for WePay OAuth2 process
+    """
+
+    app = get_wepay_model('app').objects.get_current()
+    
+    def get_redirect_uri(self):
+        """
+        Returns current view's url. Overide this method to supply a different
+        redirect_uri for oauth2 calls.
+        """
+
+        return self.request.path
+
+    def get_authorization_url(self, user=None, **kwargs):
+        """
+        Calls :meth:`djwepay.api.AppApi.api_oauth2_authorize` and returns a url where
+        user can be sent off to in order to grand access. Prefills ``redirect_uri``
+        by calling :func:`get_redirect_uri`. ``user_name`` and ``user_email`` 
+        parameters are prefilled by using information from django :attr:`user`
+        object, which can be passed as a keyword argument otherwise it defaults to 
+        ``self.request.user``, in order to prevent that behavior pass ``user=False``. 
+        Any extra keywords will be passed along to the api call.
+
+        :keyword django.contrib.auth.models.User user: Will be used to 
+            prefill ``user_name`` and ``user_email``, set ``user`` to ``False`` 
+            in order to prevent it. Defaults to ``self.request.user``.
+            
+        """
+
+        if user != False:
+            user = user or self.request.user
+            if not user.is_anonymous():
+                if not 'user_name' in kwargs:
+                    kwargs['user_name'] = user.get_full_name()
+                if not 'user_email' in kwargs:
+                    kwargs['user_email'] = user.email
+        return self.app.api_oauth2_authorize(
+            redirect_uri=self.get_redirect_uri(), **kwargs)
+
+    def get_token(self, **kwargs):
+        """
+        Calls :func:`djwepay.api.App.api_oauth2_token`
+        """
+        if 'error' in request.GET and request.GET['error'] == "access_denied":
+            return {
+                'error': request.GET['error'],
+                'error_code': None,
+                'error_description': request.GET.get('error_description', '')
+            }
+        try:
+            code = self.request.GET['code']
+        except KeyError:
+            return {
+                'error': 'code_missing',
+                'error_code': None,
+                'error_description': "'code' is missing from GET parameters"
+            }
+        try:
+            user, response = self.app.api_oauth2_token(
+                code=code, redirect_uri=self.get_redirect_uri(), **kwargs)
+            return {
+                'user': user,
+                'response': response,
+                'access_token': response['access_token']
+            }
+        except WePayError, e:
+            if e.code == 1012: # the code has expired
+                return {
+                    'error': e.error,
+                    'error_code': e.code,
+                    'error_description': e.message
+                }
+            raise
+
+
+
 class TestsCallbackView(View):
     """
     This view is used whenever the tests for djwepay app are being run.
@@ -73,3 +151,4 @@ class TestsCallbackView(View):
 
     def get(self, request, **kwargs):
         return HttpResponse("Success.")
+
