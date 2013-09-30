@@ -34,7 +34,7 @@ class IPNView(View):
                 raise Http404("User object with user_id: '%s' not found." % obj_id)
             obj = model(pk=obj_id)
         if not user_id is None:
-            user = get_object_or_404(get_wepay_model('user'), pk=kwargs['user_id'])
+            user = get_object_or_404(get_wepay_model('user'), pk=user_id)
             obj.access_token = user.access_token
         try:
             api_call = getattr(obj, "api_%s" % obj_name)
