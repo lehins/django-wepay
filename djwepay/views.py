@@ -96,20 +96,15 @@ class OAuth2Mixin(object):
         """
         Calls :func:`djwepay.api.App.api_oauth2_token`
         """
-        if 'error' in request.GET and request.GET['error'] == "access_denied":
-            return {
-                'error': request.GET['error'],
-                'error_code': None,
-                'error_description': request.GET.get('error_description', '')
-            }
+        if 'error' in self.request.GET and \
+           self.request.GET['error'] == "access_denied":
+            raise AttributeError("%s - %s" % (
+                self.request.GET['error'], 
+                self.request.GET.get('error_description', '')))
         try:
             code = self.request.GET['code']
         except KeyError:
-            return {
-                'error': 'code_missing',
-                'error_code': None,
-                'error_description': "'code' is missing from GET parameters"
-            }
+            raise AttributeError("'code' is missing from GET parameters")
         try:
             user, response = self.app.api_oauth2_token(
                 code=code, redirect_uri=self.get_redirect_uri(), **kwargs)
@@ -120,11 +115,7 @@ class OAuth2Mixin(object):
             }
         except WePayError, e:
             if e.code == 1012: # the code has expired
-                return {
-                    'error': e.error,
-                    'error_code': e.code,
-                    'error_description': e.message
-                }
+                raise AttributeError(str(e))
             raise
 
 

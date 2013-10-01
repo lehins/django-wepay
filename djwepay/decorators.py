@@ -22,7 +22,7 @@ class batchable(object):
         kwargs.pop('batch_mode', None)
         call = self._func(batch_mode=True, **kwargs)
         if not reference_id is None:
-            call['reference_id'] = None
+            call['reference_id'] = reference_id
         batch_key = make_batch_key(batch_id)
         calls = cache.get(batch_key, [])
         calls.append(call)

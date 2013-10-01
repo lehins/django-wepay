@@ -123,7 +123,7 @@ class AppApi(Api):
         if not self._api_uri_modifier(kwargs, 'callback_uri'):
             kwargs['callback_uri'] = self._api_callback_uri(obj_name='user')
         self._api_uri_modifier(kwargs, 'redirect_uri')
-        response = self.api.oauth2_token( **kwargs)
+        response = self.api.oauth2_token(**kwargs)
         return self._api_create('user', response)
 
     def api_preapproval_create(self, **kwargs):

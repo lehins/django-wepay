@@ -124,7 +124,7 @@ class AccountManager(models.Manager):
         return self.exclude(user__access_token=None)
 
     def active(self):
-        return self.accessible().exclude(state='deleted')
+        return self.accessible().filter(state='active')
 
 class Account(AccountApi, BaseModel):
     account_id = models.BigIntegerField(primary_key=True)
