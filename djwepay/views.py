@@ -19,6 +19,11 @@ class IPNView(View):
         return super(IPNView, self).dispatch(*args, **kwargs)
 
     def post(self, request, obj_name=None, user_id=None, **kwargs):
+        if obj_name == 'preapproval' and 'checkout_id' in request.POST:
+            # as described in https://www.wepay.com/developer/reference/ipn
+            # checkouts created automatically will receive IPNs to preapproval's
+            # callback_uri
+            obj_name = 'checkout'
         model = get_wepay_model(obj_name)
         obj_id_name = "%s_id" % obj_name
         user = None
@@ -92,7 +97,7 @@ class OAuth2Mixin(object):
         return self.app.api_oauth2_authorize(
             redirect_uri=self.get_redirect_uri(), **kwargs)
 
-    def get_token(self, **kwargs):
+    def get_user(self, **kwargs):
         """
         Calls :func:`djwepay.api.App.api_oauth2_token`
         """
@@ -108,11 +113,7 @@ class OAuth2Mixin(object):
         try:
             user, response = self.app.api_oauth2_token(
                 code=code, redirect_uri=self.get_redirect_uri(), **kwargs)
-            return {
-                'user': user,
-                'response': response,
-                'access_token': response['access_token']
-            }
+            return user
         except WePayError, e:
             if e.code == 1012: # the code has expired
                 raise AttributeError(str(e))

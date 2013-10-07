@@ -23,7 +23,6 @@ from json_field import JSONField
 __all__ = ['App', 'User', 'Account', 'Checkout', 'Preapproval', 'Withdrawal', 
            'CreditCard']
 
-
 APP_CACHE = {}
 
 class BaseModel(models.Model):
@@ -85,7 +84,7 @@ class App(AppApi, BaseModel):
 
     objects = AppManager()
 
-    class Meta:
+    class Meta(BaseModel.Meta):
         abstract = is_abstract('app')
         db_table = 'djwepay_app'
         verbose_name = 'WePay App'
@@ -113,7 +112,7 @@ class User(UserApi, BaseModel):
     def __str__(self):
         return self.user_name
 
-    class Meta:
+    class Meta(BaseModel.Meta):
         abstract = is_abstract('user')
         db_table = 'djwepay_user'
         verbose_name = 'WePay User'
@@ -145,7 +144,7 @@ class Account(AccountApi, BaseModel):
     def __str__(self):
         return "%s - %s" % (self.pk, self.name)
 
-    class Meta:
+    class Meta(BaseModel.Meta):
         abstract = is_abstract('account')
         db_table = 'djwepay_account'
         verbose_name = 'WePay Account'
@@ -190,7 +189,7 @@ class Checkout(CheckoutApi, BaseModel):
     def __str__(self):
         return "%s - %s" % (self.pk, self.short_description)
 
-    class Meta:
+    class Meta(BaseModel.Meta):
         abstract = is_abstract('checkout')
         db_table = 'djwepay_checkout'
         verbose_name = 'WePay Checkout'
@@ -230,7 +229,7 @@ class Preapproval(PreapprovalApi, BaseModel):
     def __str__(self):
         return "%s - %s" % (self.pk, self.short_description)
 
-    class Meta:
+    class Meta(BaseModel.Meta):
         abstract = is_abstract('preapproval')
         db_table = 'djwepay_preapproval'
         verbose_name = 'WePay Preapproval'
@@ -252,7 +251,7 @@ class Withdrawal(WithdrawalApi, BaseModel):
     def __str__(self):
         return "%s - %s" % (self.pk, self.amount)
 
-    class Meta:
+    class Meta(BaseModel.Meta):
         abstract = is_abstract('withdrawal')
         db_table = 'djwepay_withdrawal'
         verbose_name = 'WePay Preapproval'
@@ -270,7 +269,7 @@ class CreditCard(CreditCardApi, BaseModel):
     def __str__(self):
         return self.credit_card_name
 
-    class Meta:
+    class Meta(BaseModel.Meta):
         abstract = is_abstract('credit_card')
         db_table = 'djwepay_credit_card'
         verbose_name = 'WePay Credit Card'
