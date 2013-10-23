@@ -81,6 +81,7 @@ class App(AppApi, BaseModel):
     client_secret = models.CharField(max_length=255)
     access_token = models.CharField(max_length=255)
     production = models.BooleanField(default=True)
+    state = models.CharField(max_length=255)
 
     objects = AppManager()
 
@@ -181,6 +182,7 @@ class Checkout(CheckoutApi, BaseModel):
     shipping_address = JSONField(null=True)
     tax = MoneyField(null=True)
     amount_refunded = MoneyField(null=True)
+    amount_charged_back = MoneyField(null=True)
     create_time = models.BigIntegerField(null=True)
     mode = models.CharField(max_length=255)
 
