@@ -61,14 +61,15 @@ class OAuth2Mixin(object):
     Mixin for Django generic style views that is helpfull for WePay OAuth2 process
     """
 
-    app = get_wepay_model('app').objects.get_current()
+    @property
+    def app(self):
+        return get_wepay_model('app').objects.get_current()
     
     def get_redirect_uri(self):
         """
-        Returns current view's url. Overide this method to supply a different
+        Returns current view's url. Override this method to supply a different
         redirect_uri for oauth2 calls.
         """
-
         return self.request.path
 
     def get_authorization_url(self, user=None, **kwargs):
