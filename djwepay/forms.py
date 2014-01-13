@@ -1,14 +1,11 @@
 from django import forms
 
 from djwepay.api import get_wepay_model
-from djwepay.backends import WePay
 
 class AppForm(forms.ModelForm):
     def save(self, *args, **kwargs):
         if self.instance:
-            api = WePay(self.instance)
-            response = api.app()
-            self.instance._api_update(response)
+            self.instance.api_app()
         return super(AppForm, self).save(*args, **kwargs)
 
     class Meta:

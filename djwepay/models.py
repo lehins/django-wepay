@@ -10,7 +10,7 @@ from Api objects defined in :mod:`djwepay.api`.
 
 """
 
-import datetime
+import datetime, pytz
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.db import models
@@ -32,8 +32,9 @@ class BaseModel(models.Model):
     def save(self, *args, **kwargs):
         ''' On save, update timestamps '''
         if not self.date_created:
-            self.date_created = datetime.datetime.today()
-        self.date_modified = datetime.datetime.today()
+            self.date_created = datetime.datetime.now(pytz.timezone(settings.TIME_ZONE))
+            #datetime.datetime.today()
+        self.date_modified = datetime.datetime.now(pytz.timezone(settings.TIME_ZONE))
         return super(BaseModel, self).save(*args, **kwargs)
 
     class Meta:
@@ -91,6 +92,13 @@ class App(AppApi, BaseModel):
         verbose_name = 'WePay App'
 
 class UserManager(models.Manager):
+
+    def create_from_response(self, response):
+        try:
+            user = self.get(pk=response['user_id'])
+        except self.model.DoesNotExist:
+            user = self.model()
+        return user.instance_update(response)
     
     def accessible(self):
         return self.exclude(access_token=None)
@@ -120,11 +128,16 @@ class User(UserApi, BaseModel):
 
 class AccountManager(models.Manager):
     
+    def create_from_response(self, user, response):
+        account = self.model(user=user)
+        return account.instance_update(response)
+
     def accessible(self):
         return self.exclude(user__access_token=None)
 
     def active(self):
         return self.accessible().filter(state='active')
+
 
 class Account(AccountApi, BaseModel):
     account_id = models.BigIntegerField(primary_key=True)
@@ -133,12 +146,15 @@ class Account(AccountApi, BaseModel):
     state = models.CharField(max_length=255)
     description = models.CharField(max_length=255)
     reference_id = models.CharField(max_length=255)
-    payment_limit = MoneyField(null=True)
     gaq_domains = JSONField(null=True, blank=True)
     theme_object = JSONField(null=True, blank=True)
-    verification_state = models.CharField(max_length=255)
     type = models.CharField(max_length=255)
     create_time = models.BigIntegerField(null=True)
+    balances = JSONField(null=True, blank=True)
+    statuses = JSONField(null=True, blank=True)
+    action_reasons = JSONField(null=True, blank=True)
+    country = models.CharField(max_length=2)
+    currencies = JSONField(null=True, blank=True)
 
     objects = AccountManager()
     
@@ -152,6 +168,10 @@ class Account(AccountApi, BaseModel):
 
 class AccountObjectsManager(models.Manager):
     
+    def create_from_response(self, account, response):
+        obj = self.model(account=account)
+        return obj.instance_update(response)
+
     def accessible(self):
         return self.exclude(account__user__access_token=None)
 
@@ -275,3 +295,99 @@ class CreditCard(CreditCardApi, BaseModel):
         abstract = is_abstract('credit_card')
         db_table = 'djwepay_credit_card'
         verbose_name = 'WePay Credit Card'
+
+
+class SubscriptionPlan(SubscriptionPlanApi, BaseModel):
+    subscription_plan_id = models.BigIntegerField(primary_key=True)
+    account = models.ForeignKey(
+        get_wepay_model_name('account'), related_name='subscription_plans')
+    name = models.CharField(max_length=255)
+    short_description = models.CharField(max_length=2047)
+    currency = models.CharField(max_length=3)
+    amount = MoneyField(null=True)
+    period = models.CharField(max_length=255)
+    app_fee = MoneyField(null=True)
+    fee_payer = models.CharField(max_length=255)
+    state = models.CharField(max_length=255)
+    create_time = models.BigIntegerField(null=True)
+    number_of_subscriptions = models.BigIntegerField(null=True)
+    trial_length = models.BigIntegerField(null=True)
+    setup_fee = MoneyField(null=True)
+    reference_id = models.CharField(max_length=255)
+    
+    objects = AccountObjectsManager()
+
+    class Meta(BaseModel.Meta):
+        abstract = is_abstract('subscription_plan')
+        db_table = 'djwepay_subscription_plan'
+        verbose_name = 'WePay Subscription Plan'
+
+
+class SubscriptionManager(models.Manager):
+    
+    def create_from_response(self, subscription_plan, response):
+        obj = self.model(subscription_plan=subscription_plan)
+        return obj.instance_update(response)
+
+    def accessible(self):
+        return self.exclude(subscription_plan__account__user__access_token=None)
+
+
+class Subscription(SubscriptionApi, BaseModel):
+    subscription_id = models.BigIntegerField(primary_key=True)
+    subscription_plan = models.ForeignKey(
+        get_wepay_model_name('subscription_plan'), related_name='subscriptions')
+    payer_name = models.CharField(max_length=255)
+    payer_email = models.CharField(max_length=255)
+    currency = models.CharField(max_length=255)
+    amount = MoneyField(null=True)
+    period = models.CharField(max_length=255)
+    app_fee = MoneyField(null=True)
+    fee_payer = models.CharField(max_length=255)
+    state = models.CharField(max_length=255)
+    create_time = models.BigIntegerField(null=True)
+    payment_method_id = models.BigIntegerField(null=True)
+    payment_method_type = models.CharField(max_length=255)
+    quantity = models.BigIntegerField(null=True)
+    mode = models.CharField(max_length=255)
+    trial_days_remaining = models.BigIntegerField(null=True)
+    transition_expire_time = models.BigIntegerField(null=True)
+    transition_prorate = models.NullBooleanField()
+    transition_quantity = models.BigIntegerField(null=True)
+    transition_subscription_plan = models.ForeignKey(
+        get_wepay_model_name('subscription_plan'), 
+        related_name='transition_subscriptions')
+    reference_id = models.CharField(max_length=255)
+
+    objects = SubscriptionManager()
+
+    class Meta(BaseModel.Meta):
+        abstract = is_abstract('subscription')
+        db_table = 'djwepay_subscription'
+        verbose_name = 'WePay Subscription'
+
+
+class SubscriptionCharge(SubscriptionChargeApi, BaseModel):
+    subscription_charge_id = models.BigIntegerField(primary_key=True)
+    subscription_plan = models.ForeignKey(
+        get_wepay_model_name('subscription_plan'), related_name='subscription_charges')
+    subscription = models.ForeignKey(
+        get_wepay_model_name('subscription'), related_name='subscription_charges')
+    type = models.CharField(max_length=255)
+    amount = MoneyField(null=True)
+    currency = models.CharField(max_length=3)
+    fee = MoneyField(null=True)
+    app_fee = MoneyField(null=True)
+    gross = MoneyField(null=True)
+    quantity = models.BigIntegerField(null=True)
+    amount_refunded = MoneyField(null=True)
+    amount_charged_back = MoneyField(null=True)
+    state = models.CharField(max_length=255)
+    create_time = models.BigIntegerField(null=True)
+    end_time = models.BigIntegerField(null=True)
+    prorate_time = models.BigIntegerField(null=True)
+
+    class Meta(BaseModel.Meta):
+        abstract = is_abstract('subscription_charge')
+        db_table = 'djwepay_subscription_charge'
+        verbose_name = 'WePay Subscription Charge'

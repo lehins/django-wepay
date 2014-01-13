@@ -17,8 +17,14 @@ setup(
     license='MIT License',
     url='https://github.com/lehins/django-wepay',
     platforms=["any"],
+    install_requires=[
+        'python-wepay>=1.2.0'
+    ],
+    dependency_links=[
+        'http://github.com/lehins/python-wepay/tarball/master#egg=python-wepay-1.2.0'
+    ],
     classifiers=[
-        'Development Status :: 2 - Pre-Alpha',
+        'Development Status :: 4 - Beta',
         'Framework :: Django',
         'Intended Audience :: Developers',
         'License :: OSI Approved :: MIT License',

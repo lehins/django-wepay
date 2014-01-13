@@ -44,7 +44,6 @@ class IPNView(View):
         try:
             api_call = getattr(obj, "api_%s" % obj_name)
             api_call()
-            obj.save()
         except WePayError, e:
             if e.code == 1011 and not user is None: # acess_token has been revoked
                 user.access_token = None
@@ -53,7 +52,7 @@ class IPNView(View):
                 return HttpResponse(
                     "WePay error on update. %s" % e, status=500)
         ipn_processed.send(sender=model, instance=obj)
-        return HttpResponse("Successfull object update.")
+        return HttpResponse("Successfull %s update." % obj_name)
         
 
 class OAuth2Mixin(object):
@@ -72,23 +71,23 @@ class OAuth2Mixin(object):
         """
         return self.request.path
 
-    def get_authorization_url(self, user=None, **kwargs):
-        """
-        Calls :meth:`djwepay.api.AppApi.api_oauth2_authorize` and returns a url where
+    def get_authorization_url(self, user=None, prefill=True, **kwargs):
+        """Calls :meth:`djwepay.api.AppApi.api_oauth2_authorize` and returns a url where
         user can be sent off to in order to grand access. Prefills ``redirect_uri``
         by calling :func:`get_redirect_uri`. ``user_name`` and ``user_email`` 
         parameters are prefilled by using information from django :attr:`user`
         object, which can be passed as a keyword argument otherwise it defaults to 
-        ``self.request.user``, in order to prevent that behavior pass ``user=False``. 
+        ``self.request.user``, in order to prevent that behavior pass ``prefill=False``. 
         Any extra keywords will be passed along to the api call.
 
-        :keyword django.contrib.auth.models.User user: Will be used to 
-            prefill ``user_name`` and ``user_email``, set ``user`` to ``False`` 
-            in order to prevent it. Defaults to ``self.request.user``.
-            
+        :keyword User user: Will be used to prefill ``user_name`` and
+            ``user_email``. Defaults to ``self.request.user``.
+
+        :keyword bool prefill: set to ``False`` in order to prevent user info retrival.
+
         """
 
-        if user != False:
+        if prefill:
             user = user or self.request.user
             if not user.is_anonymous():
                 if not 'user_name' in kwargs:

@@ -8,6 +8,9 @@ CACHE_BATCH_KEY_PREFIX = getattr(
 def make_batch_key(batch_id):
     return "%s-%s" % (CACHE_BATCH_KEY_PREFIX, batch_id)
 
+def make_callback_key(batch_key, reference_id):
+    return "%s-%s" % (batch_key, reference_id)
+
 def from_string_import(string):
     """
     Returns the attribute from a module, specified by a string.

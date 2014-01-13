@@ -34,7 +34,6 @@ class Command(BaseCommand):
             method = getattr(obj, "api_%s" % obj_name)
             try:
                 method()
-                obj.save()
                 print "Updated object with id: %s" % obj.pk
             except WePayError, e:
                 if e.code == 1011:
