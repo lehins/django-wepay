@@ -18,8 +18,10 @@ THROTTLE_CALL_LIMIT = getattr(settings, 'WEPAY_THROTTLE_CALL_LIMIT', 30)
 THROTTLE_TIMEOUT = getattr(settings, 'WEPAY_THROTTLE_TIMEOUT', 10)
 THROTTLE_CALL_KEY = getattr(settings, 'WEPAY_THROTTLE_CALL_KEY', 'wepay-throttle-call')
 BLOCKING_KEY = THROTTLE_CALL_KEY + '-blocked'
-CACHE_BATCH_TIMEOUT = getattr(settings, 'WEPAY_CACHE_BATCH_TIMEOUT', None)
 DOMAIN = getattr(settings, 'WEPAY_DOMAIN', None)
+
+BATCH_CALLS_CACHE = {}
+BATCH_CALLBACKS = {}
 
 class Call(calls.base.Call):
 
@@ -33,12 +35,13 @@ class Call(calls.base.Call):
                 # put callback in the cache
                 assert not reference_id is None, \
                     "'batch_reference_id' is required when 'callback' is provided"
-                callback_key = make_callback_key(batch_key, reference_id)
-                cache.set(callback_key, callback, CACHE_BATCH_TIMEOUT)
+                callbacks = BATCH_CALLBACKS.get(batch_key, {})
+                callbacks[reference_id] = callback
+                BATCH_CALLBACKS[batch_key] = callbacks
             # put the actual call in the cache
-            calls = cache.get(batch_key, [])
+            calls = BATCH_CALLS_CACHE.get(batch_key, [])
             calls.append(call)
-            cache.set(batch_key, calls, CACHE_BATCH_TIMEOUT)
+            BATCH_CALLS_CACHE[batch_key] = calls
             return None
         else:
             response = super(Call, self).make_call(func, params, extra_kwargs)
@@ -165,8 +168,9 @@ class Batch(Call, calls.Batch):
             response = call['response']
             processed = None
             if 'error' in response:
-                processed = WePayError(response['error'], response['error_description'], 
-                                       response['error_code'])
+                call['error'] = WePayError(response['error'], 
+                                           response['error_description'], 
+                                           response['error_code'])
             elif not reference_id is None:
                 callback_key = make_callback_key(batch_key, reference_id)
                 callback = cache.get(callback_key, None)
@@ -183,24 +187,31 @@ class Batch(Call, calls.Batch):
 
         """
         batch_key = make_batch_key(batch_id)
-        calls = cache.get(batch_key)
+        calls = BATCH_CALLS_CACHE.get(batch_key)
         calls_response = []
         while calls:
             cur_calls = calls[:50]
             response = super(Batch, self).create(calls=cur_calls, **kwargs)[1]
-            cache.set(batch_key, calls[50:], CACHE_BATCH_TIMEOUT)
             calls_response.extend(response['calls'])
-            calls = cache.get(batch_key)
-        return (None, {'calls': self.process_calls(batch_key, calls_response)})
+            calls = calls[50:]
+        response = (None, {'calls': self.process_calls(batch_key, calls_response)})
+        self.del_calls(batch_id)
+        return response
 
-    def clear(self, batch_id):
-        cache.delete(make_batch_key(batch_id))
+    def del_calls(self, batch_id):
+        batch_key = make_batch_key(batch_id)
+        try:
+            del BATCH_CALLBACKS[batch_key]
+        except KeyError: pass
+        try:
+            del BATCH_CALLS_CACHE[batch_key]
+        except KeyError: pass
 
     def get_calls(self, batch_id):
-        return cache.get(make_batch_key(batch_id))
+        return BATCH_CALLS_CACHE.get(make_batch_key(batch_id))
 
     def set_calls(self, batch_id, calls):
-        cache.set(make_batch_key(batch_id), calls, CACHE_BATCH_TIMEOUT)
+        BATCH_CALLS_CACHE[make_batch_key(batch_id)] = calls
 
 
 class WePay(PythonWePay):

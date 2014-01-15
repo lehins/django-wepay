@@ -66,7 +66,7 @@ class Api(object):
     api = WePayLazy()
     app = AppLazy()
 
-    def instance_update(self, response):
+    def instance_update(self, response, commit=True):
         previous_state = getattr(self, 'state', '') # app object doesn't have state?
         new_state = response.get('state', '')
         for key, value in response.iteritems():
@@ -83,8 +83,12 @@ class Api(object):
             cache.set(cache_key, new_state)                
             state_changed.send(sender=type(self), instance=self, 
                                previous_state=previous_state)
-        self.save()
+        if commit:
+            self.save()
         return self
+
+    def instance_update_nocommit(self, response):
+        return self.instance_update(response, commit=False)
 
     def instance_identity(self, response):
         return self
@@ -199,7 +203,7 @@ class AccountApi(Api):
 
     @cached_property
     def uri(self):
-        return self.api_get_update_uri()[1].get('uri', None)
+        return self.api_account_get_update_uri()[1].get('uri', None)
 
     def api_account(self, **kwargs):
         try:
@@ -226,12 +230,10 @@ class AccountApi(Api):
             callback=self.instance_update, **kwargs)
 
     def api_account_get_update_uri(self, **kwargs):
-        instance, response = self.api.account.get_update_uri(
+        return self.api.account.get_update_uri(
             account_id=self.pk, 
             access_token=self.access_token, 
-            callback=self.instance_identity, **kwargs)
-        self.uri = response['uri']
-        return (instance, response)
+            callback=self.instance_update_nocommit, **kwargs)
         
     def api_account_get_reserve_details(self, **kwargs):
         return self.api.account.getreserve_details(

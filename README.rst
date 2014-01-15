@@ -46,10 +46,9 @@ Features
 * IPN calls handling for all objects. 
 * Signals upon state change an objects as well as for an IPN call.
 * Ability to change backend (communication module with WePay). Default backend features:
-  * Protection from throttling
+  * Protection from throttling (threadsafe)
   * Automatic storing of batch calls for later invocation.
   * Logging 
-  * Multithread safe
 
 Configuration
 -------------
@@ -100,8 +99,6 @@ Settings
   throttled after. Default is 30.
 * ``WEPAY_THROTTLE_TIMEOUT`` - throttle timespan. Default is 10 seconds.
 * ``WEPAY_THROTTLE_CALL_KEY`` - cache key for storing throttling info.
-* ``WEPAY_CACHE_BATCH_TIMEOUT`` - how long in seconds should batch calls should
-  be stored in cache for before expiring.
 * ``WEPAY_CACHE_BATCH_KEY_PREFIX`` - cache key prefix for storing batch calls
   and associated callbacks in cache, for later processing.
 * ``WEPAY_DOMAIN`` - your site's domain, if ``None`` will use django's `sites` app.
