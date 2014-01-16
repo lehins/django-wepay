@@ -9,7 +9,13 @@ long_description = open('README.rst').read() if os.path.isfile('README.rst') \
 setup(
     name='django-wepay',
     version=djwepay.get_version(),
-    packages=['djwepay'],
+    packages=[
+        'djwepay', 
+        'djwepay.backends', 
+        'djwepay.management', 
+        'djwepay.management.commands',
+        'djwepay.templatetags'
+    ],
     description=short_description,
     long_description=long_description,
     author='lehins',
