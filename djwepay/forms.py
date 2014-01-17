@@ -1,8 +1,33 @@
 from django import forms
+from django.utils.functional import curry
 
 from djwepay.api import get_wepay_model
+from wepay.exceptions import WePayError
 
 class AppForm(forms.ModelForm):
+
+    def clean(self):
+        # update/create associated account
+        account_id = self.data.get('account', None)
+        if account_id:
+            Account = get_wepay_model('account')
+            try:
+                account_id = int(account_id)
+            except ValueError, exc:
+                raise forms.ValidationError(str(exc))
+            try:
+                try:
+                    account = Account.objects.get(pk=account_id)
+                    account.api_account()
+                except Account.DoesNotExist:
+                    account, response = self.instance.api.account(
+                        account_id=account_id,
+                        callback=curry(Account.objects.create_from_response, None))
+                    self.cleaned_data['account'] = account
+            except WePayError, exc:
+                raise forms.ValidationError(str(exc))
+        return super(AppForm, self).clean()
+
     def save(self, *args, **kwargs):
         if self.instance:
             self.instance.api_app()
@@ -10,6 +35,7 @@ class AppForm(forms.ModelForm):
 
     class Meta:
         model = get_wepay_model('app')
+
 
 ACCOUNT_TYPE_CHOICES = (
     ('personal', u"Personal"),

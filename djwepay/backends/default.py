@@ -173,7 +173,10 @@ class Batch(Call, calls.Batch):
                                            response['error_code'])
             elif not reference_id is None:
                 callback_key = make_callback_key(batch_key, reference_id)
-                callback = cache.get(callback_key, None)
+                callbacks = BATCH_CALLBACKS.get(batch_key, None)
+                callback = None
+                if callbacks:
+                    callback = callbacks.get(reference_id, None)
                 if not callback is None and callable(callback):
                     processed = callback(response)
             call['processed'] = processed

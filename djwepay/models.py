@@ -83,6 +83,10 @@ class App(AppApi, BaseModel):
     access_token = models.CharField(max_length=255)
     production = models.BooleanField(default=True)
     state = models.CharField(max_length=255)
+    api_version = models.CharField(max_length=255)
+    account = models.ForeignKey(
+        get_wepay_model_name('account'), related_name='apps', 
+        null=True, blank=True)
 
     objects = AppManager()
 
@@ -141,11 +145,12 @@ class AccountManager(models.Manager):
 
 class Account(AccountApi, BaseModel):
     account_id = models.BigIntegerField(primary_key=True)
-    user = models.ForeignKey(get_wepay_model_name('user'), related_name='accounts')
+    user = models.ForeignKey(
+        get_wepay_model_name('user'), related_name='accounts', null=True)
     name = models.CharField(max_length=255)
     state = models.CharField(max_length=255)
     description = models.CharField(max_length=255)
-    reference_id = models.CharField(max_length=255)
+    reference_id = models.CharField(max_length=255, blank=True)
     gaq_domains = JSONField(null=True, blank=True)
     theme_object = JSONField(null=True, blank=True)
     type = models.CharField(max_length=255)

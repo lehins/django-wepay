@@ -5,12 +5,15 @@ from djwepay.forms import AppForm
 
 __all__ = ['AppAdmin', 'UserAdmin', 'AccountAdmin']
 
+
 class AppAdmin(admin.ModelAdmin):
     list_display = ('client_id', 'status', 'production')
     list_filter = ('status', 'production', 'date_created')
-    readonly_fields = ('status', 'date_created', 'date_modified')
+    readonly_fields = (
+        'state', 'status', 'date_created', 'date_modified', 'api_version'
+    )
+    raw_id_fields = ('account',)
     search_fields = ('status', 'theme_object', 'gaq_domain')
-
     form = AppForm
 
 if not is_abstract('app'):
@@ -30,11 +33,11 @@ if not is_abstract('user'):
 
 class AccountAdmin(admin.ModelAdmin):
     list_display = (
-        'account_id', 'name', 'user', 'state', 'verification_state', 'type'
+        'account_id', 'name', 'user', 'state', 'type'
     )
-    list_filter = ('state', 'verification_state', 'type', 'date_created')
+    list_filter = ('state', 'type', 'date_created')
     readonly_fields = (
-        'account_id', 'user', 'state', 'payment_limit', 'verification_state', 
+        'account_id', 'user', 'state', 'country', 
         'type', 'create_time', 'date_created', 'date_modified'
     )
 

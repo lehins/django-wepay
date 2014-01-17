@@ -17,7 +17,7 @@ __all__ = ['AppApi', 'UserApi', 'AccountApi', 'CheckoutApi', 'PreapprovalApi',
 # default is full access
 DEFAULT_SCOPE = getattr(
     settings, 'WEPAY_DEFAULT_SCOPE', "manage_accounts,collect_payments,"
-    "view_balance,view_user,preapprove_payments,send_money")
+    "view_user,preapprove_payments,manage_subscriptions,send_money")
 
 DEFAULT_MODELS = (
     ('app', 'djwepay.App'),
@@ -115,6 +115,12 @@ class AppApi(Api):
             client_secret=self.client_secret, 
             callback=self.instance_update, **kwargs)
 
+    def api_account(self, **kwargs):
+        return self.api.account(
+            account_id=self.account.pk, 
+            callback=self.account.instance_update, **kwargs)
+
+
     def api_oauth2_authorize(self, redirect_uri, **kwargs):
         return self.api.oauth2.authorize(
             self.client_id, redirect_uri, DEFAULT_SCOPE, **kwargs)
@@ -199,7 +205,9 @@ class AccountApi(Api):
 
     @cached_property
     def access_token(self):
-        return self.user.access_token
+        if self.user:
+            return self.user.access_token
+        return None
 
     @cached_property
     def uri(self):

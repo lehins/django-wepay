@@ -46,7 +46,7 @@ Features
 * IPN calls handling for all objects. 
 * Signals upon state change an objects as well as for an IPN call.
 * Ability to change backend (communication module with WePay). Default backend features:
-  * Protection from throttling (threadsafe)
+  * Protection from throttling (threadsafe with memcache)
   * Automatic storing of batch calls for later invocation.
   * Logging 
 
@@ -55,7 +55,7 @@ Configuration
 
 * Add 'djwepay' to ``INSTALLED_APPS``
 * (Optionally) Extend and customize models, point to their location in
-  ``WEPAY_MODELS``, run syncdb (or migrations). If this step ommited all models
+  ``WEPAY_MODELS``, run syncdb (or migrations). If this step omitted all models
   will be created.
 * Add your WePay ``App`` either in admin or directly into database. Set correct
   ``WEPAY_APP_ID``.
@@ -66,7 +66,7 @@ Settings
 
 **Required:**
 
-* ``WEPAY_APP_ID`` - WePay Application Client ID (and asossiated entry in database for this id).
+* ``WEPAY_APP_ID`` - WePay Application Client ID (and associated entry in database for this id).
 
 **Optional:**
 
@@ -95,7 +95,7 @@ Settings
 * ``WEPAY_DEBUG`` - if set to True and logging is setup will log every API
   call. Defaults to the ``DEBUG`` setting.
 * ``WEPAY_THROTTLE_PROTECT`` - turns on/off throttle protection.
-* ``WEPAY_THROTTLE_CALL_LIMIT`` - number of calls before your app will ne
+* ``WEPAY_THROTTLE_CALL_LIMIT`` - number of calls before your app will be
   throttled after. Default is 30.
 * ``WEPAY_THROTTLE_TIMEOUT`` - throttle timespan. Default is 10 seconds.
 * ``WEPAY_THROTTLE_CALL_KEY`` - cache key for storing throttling info.
