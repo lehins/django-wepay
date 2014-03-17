@@ -47,7 +47,7 @@ def get_wepay_model(obj_name):
 
 def is_abstract(obj_name):
     return not get_wepay_model_name(obj_name) == dict(DEFAULT_MODELS).get(obj_name)
-    
+
 
 class WePayLazy(LazyObject):
     def _setup(self):
@@ -67,7 +67,8 @@ class Api(object):
     app = AppLazy()
 
     def instance_update(self, response, commit=True):
-        previous_state = getattr(self, 'state', '') # app object doesn't have state?
+        is_new = False
+        previous_state = getattr(self, 'state', '')
         new_state = response.get('state', '')
         for key, value in response.iteritems():
             setattr(self, key, value)
@@ -76,15 +77,17 @@ class Api(object):
             # which has a chance of happening in multithreaded environment
             cache_key = "wepay-state-changed-%s-%s" % (type(self).__name__, self.pk)
             added = cache.add(cache_key, new_state)
+            is_new = True
             if not added:
                 stored_state = cache.get(cache_key)
                 if stored_state == new_state:
-                    return response
-            cache.set(cache_key, new_state)                
-            state_changed.send(sender=type(self), instance=self, 
-                               previous_state=previous_state)
+                    is_new = False
+                cache.set(cache_key, new_state)
         if commit:
             self.save()
+        if is_new:
+            state_changed.send(sender=type(self), instance=self,
+                               previous_state=previous_state)
         return self
 
     def instance_update_nocommit(self, response):
@@ -95,7 +98,7 @@ class Api(object):
 
     def get_callback_uri(self, **kwargs):
         return reverse('wepay:ipn', kwargs=kwargs)
-    
+
     def api_batch_create(self, **kwargs):
         return self.api.batch.create(client_id=self.app.client_id,
                                      client_secret=self.app.client_secret, **kwargs)
@@ -106,18 +109,18 @@ class AppApi(Api):
     def api_app(self, **kwargs):
         return self.api.app(
             client_id=self.client_id,
-            client_secret=self.client_secret, 
+            client_secret=self.client_secret,
             callback=self.instance_update, **kwargs)
 
     def api_app_modify(self, **kwargs):
         return self.api.app.modify(
             client_id=self.client_id,
-            client_secret=self.client_secret, 
+            client_secret=self.client_secret,
             callback=self.instance_update, **kwargs)
 
     def api_account(self, **kwargs):
         return self.api.account(
-            account_id=self.account.pk, 
+            account_id=self.account.pk,
             callback=self.account.instance_update, **kwargs)
 
 
@@ -146,10 +149,10 @@ class AppApi(Api):
     def api_preapproval_create(self, **kwargs):
         Preapproval = get_wepay_model('preapproval')
         return self.api.preapproval.create(
-            client_id=self.client_id, 
+            client_id=self.client_id,
             client_secret=self.client_secret,
             callback_uri = self.get_callback_uri(obj_name='preapproval'),
-            callback=curry(Preapproval.objects.create_from_response, None), 
+            callback=curry(Preapproval.objects.create_from_response, None),
             **kwargs)
 
     def api_preapproval_find(self, **kwargs):
@@ -158,7 +161,7 @@ class AppApi(Api):
     def api_credit_card_create(self, **kwargs):
         CreditCard = get_wepay_model('credit_card')
         return self.api.credit_card.create(
-            client_id=self.client_id, 
+            client_id=self.client_id,
             callback=CreditCard.objects.create_from_response, **kwargs)
 
     def api_credit_card_find(self, **kwargs):
@@ -176,7 +179,7 @@ class UserApi(Api):
 
     def api_user(self, **kwargs):
         return self.api.user(
-            access_token=self.access_token, 
+            access_token=self.access_token,
             callback=self.instance_update, **kwargs)
 
     def api_user_modify(self, **kwargs):
@@ -186,7 +189,6 @@ class UserApi(Api):
 
     def api_user_resend_confirmation(self, **kwargs):
         return self.api.user.resend_confirmation(
-            access_token=self.access_token,
             callback=self.instance_update, **kwargs)
 
     def api_account_create(self, **kwargs):
@@ -216,8 +218,8 @@ class AccountApi(Api):
     def api_account(self, **kwargs):
         try:
             return self.api.account(
-                account_id=self.pk, 
-                access_token=self.access_token, 
+                account_id=self.pk,
+                access_token=self.access_token,
                 callback=self.instance_update, **kwargs)
         except WePayError, e:
             if e.code == 3003: # The account has been deleted
@@ -227,26 +229,26 @@ class AccountApi(Api):
 
     def api_account_modify(self, **kwargs):
         return self.api.account.modify(
-            account_id=self.pk, 
-            access_token=self.access_token, 
+            account_id=self.pk,
+            access_token=self.access_token,
             callback=self.instance_update, **kwargs)
-        
+
     def api_account_delete(self, **kwargs):
         return self.api.account.delete(
-            account_id=self.pk, 
-            access_token=self.access_token, 
+            account_id=self.pk,
+            access_token=self.access_token,
             callback=self.instance_update, **kwargs)
 
     def api_account_get_update_uri(self, **kwargs):
         return self.api.account.get_update_uri(
-            account_id=self.pk, 
-            access_token=self.access_token, 
+            account_id=self.pk,
+            access_token=self.access_token,
             callback=self.instance_update_nocommit, **kwargs)
-        
+
     def api_account_get_reserve_details(self, **kwargs):
         return self.api.account.getreserve_details(
-            account_id=self.pk, 
-            access_token=self.access_token, 
+            account_id=self.pk,
+            access_token=self.access_token,
             callback=self.instance_identity, **kwargs)
 
     def api_checkout_create(self, **kwargs):
@@ -255,8 +257,8 @@ class AccountApi(Api):
             account_id=self.pk,
             access_token=self.access_token,
             callback_uri=self.get_callback_uri(
-                obj_name='checkout', user_id=self.user.pk), 
-            callback=curry(Checkout.objects.create_from_response, self), 
+                obj_name='checkout', user_id=self.user.pk),
+            callback=curry(Checkout.objects.create_from_response, self),
             **kwargs)
 
     def api_preapproval_create(self, **kwargs):
@@ -265,8 +267,8 @@ class AccountApi(Api):
             account_id=self.pk,
             access_token=self.access_token,
             callback_uri=self.get_callback_uri(
-                obj_name='preapproval', user_id=self.user.pk), 
-            callback=curry(Preapproval.objects.create_from_response, self), 
+                obj_name='preapproval', user_id=self.user.pk),
+            callback=curry(Preapproval.objects.create_from_response, self),
             **kwargs)
 
     def api_withdrawal_create(self, **kwargs):
@@ -275,8 +277,8 @@ class AccountApi(Api):
             account_id=self.pk,
             access_token=self.access_token,
             callback_uri=self.get_callback_uri(
-                obj_name='withdrawal', user_id=self.user.pk), 
-            callback=curry(Withdrawal.objects.create_from_response, self), 
+                obj_name='withdrawal', user_id=self.user.pk),
+            callback=curry(Withdrawal.objects.create_from_response, self),
             **kwargs)
 
     def api_subscription_plan_create(self, **kwargs):
@@ -285,23 +287,23 @@ class AccountApi(Api):
             account_id=self.pk,
             access_token=self.access_token,
             callback_uri=self.get_callback_uri(
-                obj_name='subscription_plan', user_id=self.user.pk), 
-            callback=curry(SubscriptionPlan.objects.create_from_response, self), 
+                obj_name='subscription_plan', user_id=self.user.pk),
+            callback=curry(SubscriptionPlan.objects.create_from_response, self),
             **kwargs)
 
     def api_checkout_find(self, **kwargs):
         return self.api.checkout.find(
-            account_id=self.pk, 
+            account_id=self.pk,
             access_token=self.access_token, **kwargs)
 
     def api_preapproval_find(self, **kwargs):
         return self.api.preapproval.find(
-            account_id=self.account_id, 
+            account_id=self.account_id,
             access_token=self.access_token, **kwargs)
 
     def api_withdrawal_find(self, **kwargs):
         return self.api.withdrawal.find(
-            account_id=self.pk, 
+            account_id=self.pk,
             access_token=self.access_token, **kwargs)
 
     def api_subscription_plan_find(self, **kwargs):
@@ -312,7 +314,7 @@ class AccountApi(Api):
     def api_subscription_plan_get_button(self, **kwargs):
         return self.api.subscription_plan.get_button(
             account_id=self.pk,
-            access_token=self.access_token, 
+            access_token=self.access_token,
             callback=self.instance_identity, **kwargs)
 
 
@@ -333,35 +335,35 @@ class CheckoutApi(Api):
     @cached_property
     def dispute_uri(self):
         return self.api_checkout()[1].get('dispute_uri', None)
-        
+
     def api_checkout(self, **kwargs):
         return self.api.checkout(
-            checkout_id=self.pk, 
-            access_token=self.access_token, 
+            checkout_id=self.pk,
+            access_token=self.access_token,
             callback=self.instance_update, **kwargs)
 
     def api_checkout_cancel(self, **kwargs):
         return self.api.checkout.cancel(
-            checkout_id=self.pk, 
-            access_token=self.access_token, 
+            checkout_id=self.pk,
+            access_token=self.access_token,
             callback=self.instance_update, **kwargs)
 
     def api_checkout_refund(self, **kwargs):
         return self.api.checkout.refund(
-            checkout_id=self.pk, 
-            access_token=self.access_token, 
+            checkout_id=self.pk,
+            access_token=self.access_token,
             callback=self.instance_update, **kwargs)
 
     def api_checkout_capture(self, **kwargs):
         return self.api.checkout.capture(
-            checkout_id=self.pk, 
-            access_token=self.access_token, 
+            checkout_id=self.pk,
+            access_token=self.access_token,
             callback=self.instance_update, **kwargs)
 
     def api_checkout_modify(self, **kwargs):
         return self.api.checkout.modify(
-            checkout_id=self.pk, 
-            access_token=self.access_token, 
+            checkout_id=self.pk,
+            access_token=self.access_token,
             callback=self.instance_update, **kwargs)
 
 
@@ -390,20 +392,20 @@ class PreapprovalApi(Api):
 
     def api_preapproval(self, **kwargs):
         return self.api.preapproval(
-            preapproval_id=self.pk, 
-            access_token=self.access_token, 
+            preapproval_id=self.pk,
+            access_token=self.access_token,
             callback=self.instance_update, **kwargs)
 
     def api_preapproval_cancel(self, **kwargs):
         return self.api.preapproval.cancel(
-            preapproval_id=self.pk, 
-            access_token=self.access_token, 
+            preapproval_id=self.pk,
+            access_token=self.access_token,
             callback=self.instance_update, **kwargs)
 
     def api_preapproval_modify(self, **kwargs):
         return self.api.preapproval.modify(
-            preapproval_id=self.pk, 
-            access_token=self.access_token, 
+            preapproval_id=self.pk,
+            access_token=self.access_token,
             callback=self.instance_update, **kwargs)
 
     def api_checkout_create(self, **kwargs):
@@ -412,8 +414,8 @@ class PreapprovalApi(Api):
             account_id=self.account.pk,
             access_token=self.access_token,
             callback_uri=self.get_callback_uri(
-                obj_name='checkout', user_id=self.user.pk), 
-            callback=curry(Checkout.objects.create_from_response, self.account), 
+                obj_name='checkout', user_id=self.user.pk),
+            callback=curry(Checkout.objects.create_from_response, self.account),
             **kwargs)
 
 
@@ -438,37 +440,37 @@ class WithdrawalApi(Api):
 
     def api_withdrawal(self, **kwargs):
         return self.api.withdrawal(
-            withdrawal_id=self.pk, 
-            access_token=self.access_token, 
+            withdrawal_id=self.pk,
+            access_token=self.access_token,
             callback=self.instance_update, **kwargs)
 
     def api_withdrawal_modify(self, **kwargs):
         return self.api.withdrawal.modify(
-            withdrawal_id=self.pk, 
-            access_token=self.access_token, 
+            withdrawal_id=self.pk,
+            access_token=self.access_token,
             callback=self.instance_update, **kwargs)
-        
+
 
 class CreditCardApi(Api):
     def api_credit_card(self, **kwargs):
         return self.api.credit_card(
             client_id=self.app.client_id,
             client_secret=self.app.client_secret,
-            credit_card_id=self.pk, 
+            credit_card_id=self.pk,
             callback=self.instance_update, **kwargs)
 
     def api_credit_card_authorize(self, **kwargs):
         return self.api.credit_card.authorize(
             client_id=self.app.client_id,
             client_secret=self.app.client_secret,
-            credit_card_id=self.pk, 
+            credit_card_id=self.pk,
             callback=self.instance_update, **kwargs)
 
     def api_credit_card_delete(self, **kwargs):
         return self.api.credit_card.delete(
             client_id=self.app.client_id,
             client_secret=self.app.client_secret,
-            credit_card_id=self.pk, 
+            credit_card_id=self.pk,
             callback=self.instance_update, **kwargs)
 
 
@@ -477,7 +479,7 @@ class SubscriptionPlanApi(Api):
     @cached_property
     def access_token(self):
         return self.account.access_token
-    
+
     @cached_property
     def callback_uri(self):
         return self.api_subscription_plan()[1].get('callback_uri', None)
@@ -485,27 +487,27 @@ class SubscriptionPlanApi(Api):
     def api_subscription_plan(self, **kwargs):
         return self.api.subscription_plan(
             subscription_plan_id=self.pk,
-            access_token=self.access_token, 
+            access_token=self.access_token,
             callback=self.instance_update, **kwargs)
 
     def api_subscription_plan_delete(self, **kwargs):
         return self.api.subscription_plan.delete(
             subscription_plan_id=self.pk,
-            access_token=self.access_token, 
+            access_token=self.access_token,
             callback=self.instance_update, **kwargs)
-            
+
     def api_subscription_plan_get_button(self, **kwargs):
         return self.api.subscription_plan.get_button(
             account_id=self.account.pk,
             button_type='subscription_plan',
             subscription_plan_id=self.pk,
-            access_token=self.access_token, 
+            access_token=self.access_token,
             callback=self.instance_identity, **kwargs)
 
     def api_subscription_plan_modify(self, **kwargs):
         return self.api.subscription_plan.modify(
             subscription_plan_id=self.pk,
-            access_token=self.access_token, 
+            access_token=self.access_token,
             callback=self.instance_update, **kwargs)
 
     def api_subscription_create(self, **kwargs):
@@ -528,7 +530,7 @@ class SubscriptionApi(Api):
     @cached_property
     def access_token(self):
         return self.subscription_plan.access_token
-    
+
     @cached_property
     def subscription_uri(self):
         return self.api_subscription()[1].get('subscription_uri', None)
@@ -544,19 +546,19 @@ class SubscriptionApi(Api):
     def api_subscription(self, **kwargs):
         return self.api.subscription(
             subscription_id=self.pk,
-            access_token=self.access_token, 
+            access_token=self.access_token,
             callback=self.instance_update, **kwargs)
 
     def api_subscription_cancel(self, **kwargs):
         return self.api.subscription.cancel(
             subscription_id=self.pk,
-            access_token=self.access_token, 
+            access_token=self.access_token,
             callback=self.instance_update, **kwargs)
 
     def api_subscription_modify(self, **kwargs):
         return self.api.subscription.modify(
             subscription_id=self.pk,
-            access_token=self.access_token, 
+            access_token=self.access_token,
             callback=self.instance_update, **kwargs)
 
     def api_subscription_charge_find(self, **kwargs):
@@ -571,17 +573,15 @@ class SubscriptionChargeApi(Api):
     @cached_property
     def access_token(self):
         return self.subscription_plan.access_token
-    
+
     def api_subscription_charge(self, **kwargs):
         return self.api.subscription_charge(
             subscription_charge_id=self.pk,
-            access_token=self.access_token, 
+            access_token=self.access_token,
             callback=self.instance_update, **kwargs)
 
     def api_subscription_charge_refund(self, **kwargs):
         return self.api.subscription_charge.refund(
             subscription_charge_id=self.pk,
-            access_token=self.access_token, 
+            access_token=self.access_token,
             callback=self.instance_update, **kwargs)
-
-    
