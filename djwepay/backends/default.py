@@ -55,7 +55,7 @@ class OAuth2(Call, calls.OAuth2):
     def authorize(self, cleint_id, redirect_uri, scope, **kwargs):
         return super(OAuth2, self).authorize(
             cleint_id, self.api.get_full_uri(redirect_uri), scope, **kwargs)
-    
+
     def token(self, *args, **kwargs):
         self.api.complete_uri('redirect_uri', kwargs)
         self.api.complete_uri('callback_uri', kwargs)
@@ -90,7 +90,7 @@ class Account(Call, calls.Account):
         return super(Account, self).get_update_uri(*args, **kwargs)
 
 class Checkout(Call, calls.Checkout):
-    
+
     def create(self, *args, **kwargs):
         self.api.complete_uri('redirect_uri', kwargs)
         self.api.complete_uri('callback_uri', kwargs)
@@ -103,7 +103,7 @@ class Checkout(Call, calls.Checkout):
 
 
 class Preapproval(Call, calls.Preapproval):
-    
+
     def create(self, *args, **kwargs):
         self.api.complete_uri('redirect_uri', kwargs)
         self.api.complete_uri('callback_uri', kwargs)
@@ -115,7 +115,7 @@ class Preapproval(Call, calls.Preapproval):
         return super(Preapproval, self).modify(*args, **kwargs)
 
 class Withdrawal(Call, calls.Withdrawal):
-    
+
     def create(self, *args, **kwargs):
         self.api.complete_uri('redirect_uri', kwargs)
         self.api.complete_uri('callback_uri', kwargs)
@@ -130,7 +130,7 @@ class CreditCard(Call, calls.CreditCard):
     pass
 
 class SubscriptionPlan(Call, calls.SubscriptionPlan):
-    
+
     def create(self, *args, **kwargs):
         self.api.complete_uri('callback_uri', kwargs)
         return super(SubscriptionPlan, self).create(*args, **kwargs)
@@ -141,7 +141,7 @@ class SubscriptionPlan(Call, calls.SubscriptionPlan):
 
 
 class Subscription(Call, calls.Subscription):
-    
+
     def create(self, *args, **kwargs):
         self.api.complete_uri('redirect_uri', kwargs)
         self.api.complete_uri('callback_uri', kwargs)
@@ -168,8 +168,8 @@ class Batch(Call, calls.Batch):
             response = call['response']
             processed = None
             if 'error' in response:
-                call['error'] = WePayError(response['error'], 
-                                           response['error_description'], 
+                call['error'] = WePayError(response['error'],
+                                           response['error_description'],
                                            response['error_code'])
             elif not reference_id is None:
                 callback_key = make_callback_key(batch_key, reference_id)
@@ -183,9 +183,9 @@ class Batch(Call, calls.Batch):
             processed_calls.append(call)
         return processed_calls
 
-    
-    def create(self, batch_id, **kwargs):
-        """Retrieves calls from cache, sequentially send /batch/create API calls
+
+    def create(self, batch_id, client_id, client_secret, **kwargs):
+        """Retrieves calls from cache, sequentially sends /batch/create API calls
         in chunks of up to 50 and then processes any callbacks set.
 
         """
@@ -194,7 +194,8 @@ class Batch(Call, calls.Batch):
         calls_response = []
         while calls:
             cur_calls = calls[:50]
-            response = super(Batch, self).create(calls=cur_calls, **kwargs)[1]
+            response = super(Batch, self).create(
+                client_id, client_secret, cur_calls, **kwargs)[1]
             calls_response.extend(response['calls'])
             calls = calls[50:]
         response = (None, {'calls': self.process_calls(batch_key, calls_response)})
@@ -218,7 +219,7 @@ class Batch(Call, calls.Batch):
 
 
 class WePay(PythonWePay):
-    
+
     supported_calls = [
         OAuth2, App, User, Account, Checkout, Preapproval, Withdrawal, CreditCard,
         SubscriptionPlan, Subscription, SubscriptionCharge, Batch
@@ -235,7 +236,7 @@ class WePay(PythonWePay):
         logger = logging.getLogger('djwepay.api.error')
         logger.error("\nCall: '%s' with params: '%s' produced an error: '%s'"
                            "\n%s" % (uri, params, error, '='*70))
-        
+
     def _log_debug(self, uri, params, response):
         logger = logging.getLogger('djwepay.api.debug')
         logger.debug(
@@ -278,7 +279,7 @@ class WePay(PythonWePay):
 
     def get_full_uri(self, uri):
         """
-        Used to build callback uri's. Make sure you have SITE_FULL_URL in 
+        Used to build callback uri's. Make sure you have SITE_FULL_URL in
         settings or Site app enabled.
         :param str last part of url
         """
@@ -286,7 +287,7 @@ class WePay(PythonWePay):
 
     def get_login_uri(self):
         """
-        Returns WePay login url. Better place for users then account uri, 
+        Returns WePay login url. Better place for users then account uri,
         less confusing.
         """
         uri_list = self.browser_endpoint.split('/')[:-1]
@@ -300,6 +301,3 @@ class WePay(PythonWePay):
             kwargs[keyword] = uri
             return uri
         return None
-   
-
-

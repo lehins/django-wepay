@@ -172,10 +172,11 @@ class AppApi(Api):
             client_secret=self.client_secret, **kwargs)
 
     def api_subscription_plan_find(self, **kwargs):
-        return self.api.subscription_plan.find(
-            account_id=self.pk,
-            access_token=self.access_token, **kwargs)
+        return self.api.subscription_plan.find(**kwargs)
 
+    def api_batch_create(self, batch_id, **kwargs):
+        return self.api.batch.create(
+            batch_id, self.client_id, self.client_secret, **kwargs)
 
 class UserApi(Api):
 
