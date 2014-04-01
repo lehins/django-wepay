@@ -71,6 +71,8 @@ class Api(object):
         previous_state = getattr(self, 'state', '')
         new_state = response.get('state', '')
         for key, value in response.iteritems():
+            if value == 0 and key.endswith('_id'):
+                value = None
             setattr(self, key, value)
         if new_state and new_state != previous_state:
             # using cache we eliminate duplicate calls to state_changed,
@@ -152,7 +154,7 @@ class AppApi(Api):
             client_id=self.client_id,
             client_secret=self.client_secret,
             callback_uri = self.get_callback_uri(obj_name='preapproval'),
-            callback=curry(Preapproval.objects.create_from_response, None),
+            callback=curry(Preapproval.objects.create_from_response, self),
             **kwargs)
 
     def api_preapproval_find(self, **kwargs):
@@ -196,7 +198,7 @@ class UserApi(Api):
         return self.api.account.create(
             access_token=self.access_token,
             callback_uri=self.get_callback_uri(
-                obj_name='account', user_id=self.user_id),
+                obj_name='account', user_id=self.pk),
             callback=curry(Account.objects.create_from_response, self), **kwargs)
 
     def api_account_find(self, **kwargs):
@@ -371,7 +373,10 @@ class PreapprovalApi(Api):
 
     @cached_property
     def access_token(self):
-        return self.account.access_token
+        if self.account is not None:
+            return self.account.access_token
+        elif self.app is not None:
+            return self.app.access_token
 
     @cached_property
     def preapproval_uri(self):
@@ -408,15 +413,22 @@ class PreapprovalApi(Api):
             access_token=self.access_token,
             callback=self.instance_update, **kwargs)
 
-    def api_checkout_create(self, **kwargs):
+    def api_checkout_create(self, account=None, **kwargs):
+        """Create a checkout using this preapproval. In case that preapproval
+        was authorized to send money to any account, account instance should be
+        supplied as a keyword argument.
+
+        """
+        assert bool(account) != bool(self.account), \
+            "You should supply account instance if preapproval was created on the App level"
         Checkout = get_wepay_model('checkout')
+        account = account or self.account
         return self.api.checkout.create(
-            account_id=self.account.pk,
-            access_token=self.access_token,
+            account_id=account.pk,
+            access_token=account.access_token,
             callback_uri=self.get_callback_uri(
-                obj_name='checkout', user_id=self.user.pk),
-            callback=curry(Checkout.objects.create_from_response, self.account),
-            **kwargs)
+                obj_name='checkout', user_id=account.user.pk),
+            callback=curry(Checkout.objects.create_from_response, account), **kwargs)
 
 
 class WithdrawalApi(Api):

@@ -20,7 +20,7 @@ from djwepay.fields import MoneyField
 
 from json_field import JSONField
 
-__all__ = ['App', 'User', 'Account', 'Checkout', 'Preapproval', 'Withdrawal', 
+__all__ = ['App', 'User', 'Account', 'Checkout', 'Preapproval', 'Withdrawal',
            'CreditCard']
 
 APP_CACHE = {}
@@ -71,7 +71,7 @@ class AppManager(models.Manager):
 class App(AppApi, BaseModel):
     """
     This model stores all of the relevant WePay application information. Only one
-    instance of it at a time is supported per django application, which is 
+    instance of it at a time is supported per django application, which is
     controlled by :ref:`WEPAY_APP_ID` setting.
     """
     client_id = models.BigIntegerField(primary_key=True)
@@ -85,7 +85,7 @@ class App(AppApi, BaseModel):
     state = models.CharField(max_length=255)
     api_version = models.CharField(max_length=255)
     account = models.ForeignKey(
-        get_wepay_model_name('account'), related_name='apps', 
+        get_wepay_model_name('account'), related_name='apps',
         null=True, blank=True)
 
     objects = AppManager()
@@ -103,7 +103,7 @@ class UserManager(models.Manager):
         except self.model.DoesNotExist:
             user = self.model()
         return user.instance_update(response)
-    
+
     def accessible(self):
         return self.exclude(access_token=None)
 
@@ -131,7 +131,7 @@ class User(UserApi, BaseModel):
         verbose_name = 'WePay User'
 
 class AccountManager(models.Manager):
-    
+
     def create_from_response(self, user, response):
         account = self.model(user=user)
         return account.instance_update(response)
@@ -162,7 +162,7 @@ class Account(AccountApi, BaseModel):
     currencies = JSONField(null=True, blank=True)
 
     objects = AccountManager()
-    
+
     def __str__(self):
         return "%s - %s" % (self.pk, self.name)
 
@@ -172,7 +172,7 @@ class Account(AccountApi, BaseModel):
         verbose_name = 'WePay Account'
 
 class AccountObjectsManager(models.Manager):
-    
+
     def create_from_response(self, account, response):
         obj = self.model(account=account)
         return obj.instance_update(response)
@@ -222,10 +222,21 @@ class Checkout(CheckoutApi, BaseModel):
         verbose_name = 'WePay Checkout'
 
 
+class PreapprovalManager(AccountObjectsManager):
+
+    def create_from_response(self, app_or_account, response):
+        if isinstance(app_or_account, get_wepay_model('app')):
+            preapproval = self.model(app=app_or_account)
+            return preapproval.instance_update(response)
+        return super(PreapprovalManager, self).create_from_response(app_or_account, response)
+
+
 class Preapproval(PreapprovalApi, BaseModel):
     preapproval_id = models.BigIntegerField(primary_key=True)
+    app = models.ForeignKey(
+        get_wepay_model_name('app'), null=True, related_name='preapprovals')
     account = models.ForeignKey(
-        get_wepay_model_name('account'), related_name='preapprovals')
+        get_wepay_model_name('account'), null=True, related_name='preapprovals')
     short_description = models.CharField(max_length=255)
     long_description = models.CharField(max_length=2047, blank=True)
     currency = "USD"
@@ -251,7 +262,7 @@ class Preapproval(PreapprovalApi, BaseModel):
     last_checkout_time = models.BigIntegerField(null=True)
     mode = models.CharField(max_length=255)
 
-    objects = AccountObjectsManager()
+    objects = PreapprovalManager()
 
     def __str__(self):
         return "%s - %s" % (self.pk, self.short_description)
@@ -319,7 +330,7 @@ class SubscriptionPlan(SubscriptionPlanApi, BaseModel):
     trial_length = models.BigIntegerField(null=True)
     setup_fee = MoneyField(null=True)
     reference_id = models.CharField(max_length=255)
-    
+
     objects = AccountObjectsManager()
 
     class Meta(BaseModel.Meta):
@@ -329,7 +340,7 @@ class SubscriptionPlan(SubscriptionPlanApi, BaseModel):
 
 
 class SubscriptionManager(models.Manager):
-    
+
     def create_from_response(self, subscription_plan, response):
         obj = self.model(subscription_plan=subscription_plan)
         return obj.instance_update(response)
@@ -360,7 +371,7 @@ class Subscription(SubscriptionApi, BaseModel):
     transition_prorate = models.NullBooleanField()
     transition_quantity = models.BigIntegerField(null=True)
     transition_subscription_plan = models.ForeignKey(
-        get_wepay_model_name('subscription_plan'), 
+        get_wepay_model_name('subscription_plan'),
         related_name='transition_subscriptions')
     reference_id = models.CharField(max_length=255)
 

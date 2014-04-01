@@ -44,7 +44,7 @@ ACCOUNT_TYPE_CHOICES = (
 )
 
 class AccountCreateForm(forms.Form):
-    name = forms.CharField(max_length=255, required=True,
+    name = forms.CharField(max_length=255, required=True, label="Account Name",
                            help_text=u"The name of the account you want to create.")
     description = forms.CharField(
         max_length=255, required=True, help_text=u"The description of the account "

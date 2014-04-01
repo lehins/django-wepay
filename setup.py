@@ -10,9 +10,9 @@ setup(
     name='django-wepay',
     version=djwepay.get_version(),
     packages=[
-        'djwepay', 
-        'djwepay.backends', 
-        'djwepay.management', 
+        'djwepay',
+        'djwepay.backends',
+        'djwepay.management',
         'djwepay.management.commands',
         'djwepay.templatetags'
     ],
@@ -24,10 +24,10 @@ setup(
     url='https://github.com/lehins/django-wepay',
     platforms=["any"],
     install_requires=[
-        'python-wepay>=1.2.0'
+        'python-wepay>=1.2.3'
     ],
     dependency_links=[
-        'http://github.com/lehins/python-wepay/tarball/master#egg=python-wepay-1.2.0'
+        'http://github.com/lehins/python-wepay/tarball/master#egg=python-wepay-1.2.3'
     ],
     classifiers=[
         'Development Status :: 4 - Beta',
