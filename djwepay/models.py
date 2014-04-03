@@ -25,16 +25,16 @@ __all__ = ['App', 'User', 'Account', 'Checkout', 'Preapproval', 'Withdrawal',
 
 APP_CACHE = {}
 
+
 class BaseModel(models.Model):
     date_created  = models.DateTimeField(auto_now_add=True)
     date_modified = models.DateTimeField(auto_now=True)
 
     def save(self, *args, **kwargs):
         ''' On save, update timestamps '''
-        if not self.date_created:
-            self.date_created = datetime.datetime.now(pytz.timezone(settings.TIME_ZONE))
-            #datetime.datetime.today()
         self.date_modified = datetime.datetime.now(pytz.timezone(settings.TIME_ZONE))
+        if not self.date_created:
+            self.date_created = self.date_modified
         return super(BaseModel, self).save(*args, **kwargs)
 
     class Meta:
@@ -74,19 +74,24 @@ class App(AppApi, BaseModel):
     instance of it at a time is supported per django application, which is
     controlled by :ref:`WEPAY_APP_ID` setting.
     """
+    # fields returned with a lookup call
     client_id = models.BigIntegerField(primary_key=True)
     status = models.CharField(max_length=255)
+    state = models.CharField(max_length=255)
+    api_version = models.CharField(max_length=255)
     theme_object = JSONField(null=True, blank=True)
     gaq_domains = JSONField(null=True, blank=True)
 
-    client_secret = models.CharField(max_length=255)
-    access_token = models.CharField(max_length=255)
-    production = models.BooleanField(default=True)
-    state = models.CharField(max_length=255)
-    api_version = models.CharField(max_length=255)
+    # Administrative objects attached to account
     account = models.ForeignKey(
         get_wepay_model_name('account'), related_name='apps',
-        null=True, blank=True)
+        help_text="Account of the payment account where you can collect money.")
+    user = models.ForeignKey(
+        get_wepay_model_name('user'), related_name='apps',
+        help_text="Owner of this App")
+
+    client_secret = models.CharField(max_length=255)
+    production = models.BooleanField(default=True)
 
     objects = AppManager()
 
@@ -109,6 +114,8 @@ class UserManager(models.Manager):
 
 class User(UserApi, BaseModel):
     user_id = models.BigIntegerField(primary_key=True)
+    app = models.ForeignKey(
+        get_wepay_model_name('app'), related_name='users')
     user_name = models.CharField(max_length=255)
     first_name = models.CharField(max_length=255)
     last_name = models.CharField(max_length=255)
@@ -297,6 +304,8 @@ class Withdrawal(WithdrawalApi, BaseModel):
 
 class CreditCard(CreditCardApi, BaseModel):
     credit_card_id = models.BigIntegerField(primary_key=True)
+    app = models.ForeignKey(
+        get_wepay_model_name('app'), related_name='credit_cards')
     credit_card_name = models.CharField(max_length=255)
     state = models.CharField(max_length=255)
     user_name = models.CharField(max_length=255)

@@ -185,7 +185,7 @@ class Batch(Call, calls.Batch):
 
 
     def create(self, batch_id, client_id, client_secret, **kwargs):
-        """Retrieves calls from cache, sequentially sends /batch/create API calls
+        """Retrieves queued calls, sequentially sends /batch/create API calls
         in chunks of up to 50 and then processes any callbacks set.
 
         """

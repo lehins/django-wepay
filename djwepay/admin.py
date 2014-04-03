@@ -7,14 +7,19 @@ __all__ = ['AppAdmin', 'UserAdmin', 'AccountAdmin']
 
 
 class AppAdmin(admin.ModelAdmin):
-    list_display = ('client_id', 'status', 'production')
-    list_filter = ('status', 'production', 'date_created')
-    readonly_fields = (
-        'state', 'status', 'date_created', 'date_modified', 'api_version'
-    )
-    raw_id_fields = ('account',)
-    search_fields = ('status', 'theme_object', 'gaq_domain')
+    list_display = ('client_id', 'user', 'account', 'status', 'state', 'production')
+    list_filter = ('status', 'state', 'production', 'date_created')
+    search_fields = ('state', 'status', 'theme_object', 'gaq_domain')
     form = AppForm
+
+    def get_readonly_fields(self, request, obj=None):
+        fields = [
+            'state', 'status', 'date_created', 'date_modified', 'theme_object',
+            'user', 'account'
+        ]
+        if obj:
+            fields.extend(['client_id', 'account'])
+        return fields
 
 if not is_abstract('app'):
     admin.site.register(get_wepay_model('app'), AppAdmin)
@@ -23,7 +28,7 @@ class UserAdmin(admin.ModelAdmin):
     list_display = ('user_id', 'user_name', 'email', 'state')
     list_filter = ('state', 'date_created')
     readonly_fields = (
-        'user_id', 'user_name', 'first_name', 'last_name', 'email', 'state', 
+        'user_id', 'user_name', 'first_name', 'last_name', 'email', 'state',
         'access_token', 'expires_in', 'date_created', 'date_modified'
     )
     search_fields = ('user_id', 'user_name', 'email', 'state')
@@ -37,7 +42,7 @@ class AccountAdmin(admin.ModelAdmin):
     )
     list_filter = ('state', 'type', 'date_created')
     readonly_fields = (
-        'account_id', 'user', 'state', 'country', 
+        'account_id', 'user', 'state', 'country',
         'type', 'create_time', 'date_created', 'date_modified'
     )
 

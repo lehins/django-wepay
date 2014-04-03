@@ -56,15 +56,10 @@ class WePayLazy(LazyObject):
         self._wrapped = backend(
             production=app.production, access_token=app.access_token, timeout=45)
 
-class AppLazy(LazyObject):
-    def _setup(self):
-        self._wrapped = get_wepay_model('app').objects.get_current()
-
 
 class Api(object):
 
     api = WePayLazy()
-    app = AppLazy()
 
     def instance_update(self, response, commit=True):
         is_new = False
@@ -101,12 +96,15 @@ class Api(object):
     def get_callback_uri(self, **kwargs):
         return reverse('wepay:ipn', kwargs=kwargs)
 
-    def api_batch_create(self, **kwargs):
-        return self.api.batch.create(client_id=self.app.client_id,
-                                     client_secret=self.app.client_secret, **kwargs)
 
 class AppApi(Api):
     """ App model mixin object that helps making related Api calls"""
+
+    @cached_property
+    def access_token(self):
+        if self.user:
+            return self.user.access_token
+        return None
 
     def api_app(self, **kwargs):
         return self.api.app(
