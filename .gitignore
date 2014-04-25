@@ -1,1 +1,10 @@
-djwepay/migrations
+/djwepay/migrations
+*.pyc
+*.pyo
+
+/docs/build
+/dist
+/python_wepay.egg-info
+
+.coverage
+__pycache__

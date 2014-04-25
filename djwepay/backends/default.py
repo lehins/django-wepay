@@ -23,6 +23,8 @@ DOMAIN = getattr(settings, 'WEPAY_DOMAIN', None)
 BATCH_CALLS_CACHE = {}
 BATCH_CALLBACKS = {}
 
+
+
 class Call(calls.base.Call):
 
     def make_call(self, func, params, extra_kwargs):
@@ -50,44 +52,61 @@ class Call(calls.base.Call):
                 processed = callback(response)
             return (processed, response)
 
+
+
 class OAuth2(Call, calls.OAuth2):
+
 
     def authorize(self, cleint_id, redirect_uri, scope, **kwargs):
         return super(OAuth2, self).authorize(
             cleint_id, self.api.get_full_uri(redirect_uri), scope, **kwargs)
+
 
     def token(self, *args, **kwargs):
         self.api.complete_uri('redirect_uri', kwargs)
         self.api.complete_uri('callback_uri', kwargs)
         return super(OAuth2, self).token(*args, **kwargs)
 
+
+
 class App(Call, calls.App):
     pass
 
+
+
 class User(Call, calls.User):
+
     def modify(self, *args, **kwargs):
         self.api.complete_uri('callback_uri', kwargs)
         return super(User, self).modify(*args, **kwargs)
+
 
     def register(self, *args, **kwargs):
         self.api.complete_uri('redirect_uri', kwargs)
         self.api.complete_uri('callback_uri', kwargs)
         return super(User, self).register(*args, **kwargs)
 
+
+
 class Account(Call, calls.Account):
+
     def create(self, *args, **kwargs):
         self.api.complete_uri('image_uri', kwargs)
         self.api.complete_uri('callback_uri', kwargs)
         return super(Account, self).create(*args, **kwargs)
+
 
     def modify(self, *args, **kwargs):
         self.api.complete_uri('image_uri', kwargs)
         self.api.complete_uri('callback_uri', kwargs)
         return super(Account, self).modify(*args, **kwargs)
 
+
     def get_update_uri(self, *args, **kwargs):
         self.api.complete_uri('redirect_uri', kwargs)
         return super(Account, self).get_update_uri(*args, **kwargs)
+
+
 
 class Checkout(Call, calls.Checkout):
 
@@ -97,9 +116,11 @@ class Checkout(Call, calls.Checkout):
         self.api.complete_uri('fallback_uri', kwargs)
         return super(Checkout, self).create(*args, **kwargs)
 
+
     def modify(self, *args, **kwargs):
         self.api.complete_uri('callback_uri', kwargs)
         return super(Checkout, self).modify(*args, **kwargs)
+
 
 
 class Preapproval(Call, calls.Preapproval):
@@ -110,9 +131,12 @@ class Preapproval(Call, calls.Preapproval):
         self.api.complete_uri('fallback_uri', kwargs)
         return super(Preapproval, self).create(*args, **kwargs)
 
+
     def modify(self, *args, **kwargs):
         self.api.complete_uri('callback_uri', kwargs)
         return super(Preapproval, self).modify(*args, **kwargs)
+
+
 
 class Withdrawal(Call, calls.Withdrawal):
 
@@ -122,12 +146,17 @@ class Withdrawal(Call, calls.Withdrawal):
         self.api.complete_uri('fallback_uri', kwargs)
         return super(Withdrawal, self).create(*args, **kwargs)
 
+
     def modify(self, *args, **kwargs):
         self.api.complete_uri('callback_uri', kwargs)
         return super(Withdrawal, self).modify(*args, **kwargs)
 
+
+
 class CreditCard(Call, calls.CreditCard):
     pass
+
+
 
 class SubscriptionPlan(Call, calls.SubscriptionPlan):
 
@@ -135,9 +164,11 @@ class SubscriptionPlan(Call, calls.SubscriptionPlan):
         self.api.complete_uri('callback_uri', kwargs)
         return super(SubscriptionPlan, self).create(*args, **kwargs)
 
+
     def modify(self, *args, **kwargs):
         self.api.complete_uri('callback_uri', kwargs)
         return super(SubscriptionPlan, self).modify(*args, **kwargs)
+
 
 
 class Subscription(Call, calls.Subscription):
@@ -147,13 +178,18 @@ class Subscription(Call, calls.Subscription):
         self.api.complete_uri('callback_uri', kwargs)
         return super(Subscription, self).create(*args, **kwargs)
 
+
     def modify(self, *args, **kwargs):
         self.api.complete_uri('redirect_uri', kwargs)
         self.api.complete_uri('callback_uri', kwargs)
         return super(Subscription, self).modify(*args, **kwargs)
 
+
+
 class SubscriptionCharge(Call, calls.SubscriptionCharge):
     pass
+
+
 
 class Batch(Call, calls.Batch):
 
@@ -202,6 +238,7 @@ class Batch(Call, calls.Batch):
         self.del_calls(batch_id)
         return response
 
+
     def del_calls(self, batch_id):
         batch_key = make_batch_key(batch_id)
         try:
@@ -211,11 +248,14 @@ class Batch(Call, calls.Batch):
             del BATCH_CALLS_CACHE[batch_key]
         except KeyError: pass
 
+
     def get_calls(self, batch_id):
         return BATCH_CALLS_CACHE.get(make_batch_key(batch_id))
 
+
     def set_calls(self, batch_id, calls):
         BATCH_CALLS_CACHE[make_batch_key(batch_id)] = calls
+
 
 
 class WePay(PythonWePay):
@@ -230,7 +270,9 @@ class WePay(PythonWePay):
         if domain is None:
             domain = str(Site.objects.get_current())
         self.site_uri = "https://%s" % domain
+        kwargs['timeout'] = kwargs.get('timeout', 45)
         super(WePay, self).__init__(**kwargs)
+
 
     def _log_error(self, error, uri, params):
         logger = logging.getLogger('djwepay.api.error')
@@ -242,6 +284,7 @@ class WePay(PythonWePay):
         logger.debug(
             "\nCall: '%s' was placed with params: '%s' and received a response: "
             "'%s'\n%s" % (uri, params, response, '='*70))
+
 
     def _call_protected(self, uri, **kwargs):
         blocked = cache.add(BLOCKING_KEY, True)
@@ -264,6 +307,7 @@ class WePay(PythonWePay):
             cache.delete(BLOCKING_KEY)
             return super(WePay, self).call(uri, **kwargs)
 
+
     def call(self, uri, **kwargs):
         try:
             if THROTTLE_PROTECT:
@@ -277,6 +321,7 @@ class WePay(PythonWePay):
             self._log_debug(uri, kwargs.get('params', {}), response)
         return response
 
+
     def get_full_uri(self, uri):
         """
         Used to build callback uri's. Make sure you have SITE_FULL_URL in
@@ -285,14 +330,13 @@ class WePay(PythonWePay):
         """
         return '%s%s' % (self.site_uri, uri)
 
+
     def get_login_uri(self):
         """
-        Returns WePay login url. Better place for users then account uri,
-        less confusing.
+        Returns WePay login url. Just in case if someone needs it.
         """
-        uri_list = self.browser_endpoint.split('/')[:-1]
-        uri_list.append('login')
-        return '/'.join(uri_list)
+        return '%s/login' % self.browser_uri
+
 
     def complete_uri(self, keyword, kwargs):
         """Converts to full uri and updates kwargs"""

@@ -4,19 +4,21 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic.base import View
 
-from djwepay.models import User
 from djwepay.signals import ipn_processed
 from djwepay.api import get_wepay_model
 from wepay.exceptions import WePayError
 
-__all__ = ['IPNView', 'OAuth2Mixin', 'TestsCallbackView']
+__all__ = ['IPNView', 'OAuth2Mixin']
+
 
 class IPNView(View):
+
     http_method_names = ['post']
 
     @method_decorator(csrf_exempt)
     def dispatch(self, *args, **kwargs):
         return super(IPNView, self).dispatch(*args, **kwargs)
+
 
     def post(self, request, obj_name=None, user_id=None, **kwargs):
         if obj_name == 'preapproval' and 'checkout_id' in request.POST:
@@ -36,16 +38,20 @@ class IPNView(View):
             obj = model.objects.get(pk=obj_id)
         except model.DoesNotExist:
             if obj_name == 'user':
+                # ipn received for user that wasn't created locally, cannot recreate
+                # due to lack of info, which is not the case for the rest of the objects
                 raise Http404("User object with user_id: '%s' not found." % obj_id)
             obj = model(pk=obj_id)
-        if not user_id is None:
+        if user_id is not None:
+            # retrive access_token from the user object, so we can perform a lookup call
             user = get_object_or_404(get_wepay_model('user'), pk=user_id)
             obj.access_token = user.access_token
         try:
             api_call = getattr(obj, "api_%s" % obj_name)
             api_call()
         except WePayError, e:
-            if e.code == 1011 and not user is None: # acess_token has been revoked
+            if e.code == 1011 and user is not None:
+                # acess_token has been revoked, reflect it in db
                 user.access_token = None
                 user.save()
             else:
@@ -54,6 +60,7 @@ class IPNView(View):
         ipn_processed.send(sender=model, instance=obj)
         return HttpResponse("Successfull %s update." % obj_name)
         
+
 
 class OAuth2Mixin(object):
     """
@@ -64,12 +71,14 @@ class OAuth2Mixin(object):
     def app(self):
         return get_wepay_model('app').objects.get_current()
     
+
     def get_redirect_uri(self):
         """
         Returns current view's url. Override this method to supply a different
         redirect_uri for oauth2 calls.
         """
         return self.request.path
+
 
     def get_authorization_url(self, user=None, prefill=True, **kwargs):
         """Calls :meth:`djwepay.api.AppApi.api_oauth2_authorize` and returns a url where
@@ -97,6 +106,7 @@ class OAuth2Mixin(object):
         return self.app.api_oauth2_authorize(
             redirect_uri=self.get_redirect_uri(), **kwargs)
 
+
     def get_user(self, **kwargs):
         """
         Calls :func:`djwepay.api.App.api_oauth2_token`
@@ -118,26 +128,3 @@ class OAuth2Mixin(object):
             if e.code == 1012: # the code has expired
                 raise AttributeError(str(e))
             raise
-
-
-
-class TestsCallbackView(View):
-    """
-    This view is used whenever the tests for djwepay app are being run.
-    All the api calls in the test suite run in a test enviroment (test db, 
-    no webserver etc.), but since the calls are made to the actual 
-    stage.wepay.com server we cannot give real callback_uri's instead we use this
-    fake view to send a 200 response in order to prevent IPN retries.
-    """
-    http_method_names = ['post', 'get']
-
-    @method_decorator(csrf_exempt)
-    def dispatch(self, *args, **kwargs):
-        return super(TestsCallbackView, self).dispatch(*args, **kwargs)
-
-    def post(self, request, **kwargs):
-        return HttpResponse("Success.")
-
-    def get(self, request, **kwargs):
-        return HttpResponse("Success.")
-

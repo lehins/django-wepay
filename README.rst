@@ -25,7 +25,7 @@ TODO
 ----
 
 * Full Documentation.
-* More tests.
+* Rewrite all tests (first attempt at it was not great).
 * Admin pages for all objects.
 
 Requirements
@@ -41,14 +41,15 @@ Features
 
 * Supports all WePay API calls.
 * Customizable models for all objects.
-* Ability to make API calls right from the model instance.
+* Ability to make API calls right from the model instance (prefills all known params).
 * All lookup and create API calls automatically save changes in the database.
 * IPN calls handling for all objects. 
-* Signals upon state change an objects as well as for an IPN call.
+* Signals are sent upon state change of all objects as well as upon an IPN call.
 * Ability to change backend (communication module with WePay). Default backend features:
   * Protection from throttling (threadsafe with memcache)
   * Automatic storing of batch calls for later invocation.
-  * Logging 
+  * Logging of WePay erros and/or all calls with params
+  * Validation of all params before they are sent over to WePay.
 
 Configuration
 -------------
@@ -57,8 +58,11 @@ Configuration
 * (Optionally) Extend and customize models, point to their location in
   ``WEPAY_MODELS``, run syncdb (or migrations). If this step omitted all models
   will be created.
-* Add your WePay ``App`` either in admin or directly into database. Set correct
-  ``WEPAY_APP_ID``.
+* Add your WePay ``App`` to database by running (with --production flag for Production)::
+    
+    ./manage.py wepay_app_create
+    
+* Set ``WEPAY_APP_ID`` to the Client ID present in database.
 
 
 Settings
@@ -66,12 +70,15 @@ Settings
 
 **Required:**
 
-* ``WEPAY_APP_ID`` - WePay Application Client ID (and associated entry in database for this id).
+* ``WEPAY_APP_ID`` - WePay Application Client ID (required App model isntance
+  stored in database for this id, use ``./manage.py wepay_app_create`` for that).
 
 **Optional:**
 
 * ``WEPAY_MODELS`` - a list of tuples ('object_name', 'app_name.ModelName') for
-  objects you will be working with, ex::
+  objects you will be working with, ex
+
+.. code-block:: python
 
     WEPAY_MODELS = (
         ('app', 'myapp.WePayApp'),
@@ -80,8 +87,8 @@ Settings
         ('checkout', 'myapp.WePayCheckout'),
         ('preapproval', 'myapp.WePayPreapproval'),
         ('withdrawal', 'myapp.WePayWithdrawal'),
-        ('credit_card', None),
-        ('subscription_plan', None),
+        # ('credit_card', 'djwepay.CreditCard), # if ommited default model will be used
+        ('subscription_plan', None), # None - turns off the object. No db tables will be created.
         ('subscription', None),
         ('subscription_charge', None)
     )
@@ -94,7 +101,7 @@ Settings
 
 * ``WEPAY_DEBUG`` - if set to True and logging is setup will log every API
   call. Defaults to the ``DEBUG`` setting.
-* ``WEPAY_THROTTLE_PROTECT`` - turns on/off throttle protection.
+* ``WEPAY_THROTTLE_PROTECT`` - turns on/off throttle protection (default is True).
 * ``WEPAY_THROTTLE_CALL_LIMIT`` - number of calls before your app will be
   throttled after. Default is 30.
 * ``WEPAY_THROTTLE_TIMEOUT`` - throttle timespan. Default is 10 seconds.

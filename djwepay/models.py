@@ -1,7 +1,7 @@
 """All models are direct mappings to the WePay objects. By default only the
 fields that correspond to the values returned from WePay lookup calls
 (ex. `/account <https://www.wepay.com/developer/reference/account#lookup>`_) are
-include in the models. All fields follow the rules outlined in `Storing Data
+included in the models. All fields follow the rules outlined in `Storing Data
 <https://www.wepay.com/developer/reference/storing_data>`_, unless otherwise
 specified in object's documentation. For that reason values, which have there
 names end with '_uri' (ex. ``account_uri``) are not included as model fields,
@@ -9,64 +9,39 @@ instead they are added as dynamic cached object properties, which are inherited
 from Api objects defined in :mod:`djwepay.api`.
 
 """
-
-import datetime, pytz
-from django.conf import settings
-from django.core.exceptions import ImproperlyConfigured
 from django.db import models
+from django.utils import timezone
 
 from djwepay.api import *
 from djwepay.fields import MoneyField
+from djwepay.managers import *
 
 from json_field import JSONField
 
 __all__ = ['App', 'User', 'Account', 'Checkout', 'Preapproval', 'Withdrawal',
            'CreditCard']
 
-APP_CACHE = {}
 
 
 class BaseModel(models.Model):
-    date_created  = models.DateTimeField(auto_now_add=True)
-    date_modified = models.DateTimeField(auto_now=True)
 
-    def save(self, *args, **kwargs):
-        ''' On save, update timestamps '''
-        self.date_modified = datetime.datetime.now(pytz.timezone(settings.TIME_ZONE))
-        if not self.date_created:
-            self.date_created = self.date_modified
-        return super(BaseModel, self).save(*args, **kwargs)
+    date_created  = models.DateTimeField(auto_now_add=True)
+
+    date_modified = models.DateTimeField(auto_now=True)
 
     class Meta:
         abstract = True
         ordering = ['-date_created']
 
-class AppManager(models.Manager):
 
-    def get_current(self):
-        """Returns the current :class:`App` based on the :ref:`WEPAY_APP_ID` in the
-        project's settings. The :class:`App` object is cached the first time
-        it's retrieved from the database.
+    def save(self, *args, **kwargs):
+        ''' On save, update timestamps '''
+        self.date_modified = timezone.now()
+        if not self.date_created:
+            self.date_created = self.date_modified
+        return super(BaseModel, self).save(*args, **kwargs)
 
-        """
-        try:
-            app_id = settings.WEPAY_APP_ID
-        except AttributeError:
-            raise ImproperlyConfigured(
-                "You're using the Django WePay application without having set the "
-                "WEPAY_APP_ID setting. Create an app in your database and set the "
-                "WEPAY_APP_ID setting to fix this error.")
-        try:
-            current_app = APP_CACHE[app_id]
-        except KeyError:
-            current_app = self.get(pk=app_id)
-            APP_CACHE[app_id] = current_app
-        return current_app
 
-    def clear_cache(self):
-        """Clears the ``App`` object cache."""
-        global APP_CACHE
-        APP_CACHE = {}
 
 class App(AppApi, BaseModel):
     """
@@ -82,12 +57,13 @@ class App(AppApi, BaseModel):
     theme_object = JSONField(null=True, blank=True)
     gaq_domains = JSONField(null=True, blank=True)
 
-    # Administrative objects attached to account
+    # Administrative objects attached to account, they are null=True just 
+    # for initialization of the App, but are required for proper functionality.
     account = models.ForeignKey(
-        get_wepay_model_name('account'), related_name='apps',
-        help_text="Account of the payment account where you can collect money.")
+        get_wepay_model_name('account'), related_name='apps', null=True,
+        help_text="Account attached to App where you can collect money.")
     user = models.ForeignKey(
-        get_wepay_model_name('user'), related_name='apps',
+        get_wepay_model_name('user'), related_name='apps', null=True,
         help_text="Owner of this App")
 
     client_secret = models.CharField(max_length=255)
@@ -100,17 +76,7 @@ class App(AppApi, BaseModel):
         db_table = 'djwepay_app'
         verbose_name = 'WePay App'
 
-class UserManager(models.Manager):
 
-    def create_from_response(self, response):
-        try:
-            user = self.get(pk=response['user_id'])
-        except self.model.DoesNotExist:
-            user = self.model()
-        return user.instance_update(response)
-
-    def accessible(self):
-        return self.exclude(access_token=None)
 
 class User(UserApi, BaseModel):
     user_id = models.BigIntegerField(primary_key=True)
@@ -129,25 +95,14 @@ class User(UserApi, BaseModel):
 
     objects = UserManager()
 
-    def __str__(self):
-        return self.user_name
-
     class Meta(BaseModel.Meta):
         abstract = is_abstract('user')
         db_table = 'djwepay_user'
         verbose_name = 'WePay User'
 
-class AccountManager(models.Manager):
+    def __str__(self):
+        return self.user_name
 
-    def create_from_response(self, user, response):
-        account = self.model(user=user)
-        return account.instance_update(response)
-
-    def accessible(self):
-        return self.exclude(user__access_token=None)
-
-    def active(self):
-        return self.accessible().filter(state='active')
 
 
 class Account(AccountApi, BaseModel):
@@ -170,22 +125,14 @@ class Account(AccountApi, BaseModel):
 
     objects = AccountManager()
 
-    def __str__(self):
-        return "%s - %s" % (self.pk, self.name)
-
     class Meta(BaseModel.Meta):
         abstract = is_abstract('account')
         db_table = 'djwepay_account'
         verbose_name = 'WePay Account'
 
-class AccountObjectsManager(models.Manager):
+    def __str__(self):
+        return "%s - %s" % (self.pk, self.name)
 
-    def create_from_response(self, account, response):
-        obj = self.model(account=account)
-        return obj.instance_update(response)
-
-    def accessible(self):
-        return self.exclude(account__user__access_token=None)
 
 
 class Checkout(CheckoutApi, BaseModel):
@@ -220,22 +167,14 @@ class Checkout(CheckoutApi, BaseModel):
 
     objects = AccountObjectsManager()
 
-    def __str__(self):
-        return "%s - %s" % (self.pk, self.short_description)
-
     class Meta(BaseModel.Meta):
         abstract = is_abstract('checkout')
         db_table = 'djwepay_checkout'
         verbose_name = 'WePay Checkout'
 
+    def __str__(self):
+        return "%s - %s" % (self.pk, self.short_description)
 
-class PreapprovalManager(AccountObjectsManager):
-
-    def create_from_response(self, app_or_account, response):
-        if isinstance(app_or_account, get_wepay_model('app')):
-            preapproval = self.model(app=app_or_account)
-            return preapproval.instance_update(response)
-        return super(PreapprovalManager, self).create_from_response(app_or_account, response)
 
 
 class Preapproval(PreapprovalApi, BaseModel):
@@ -271,13 +210,14 @@ class Preapproval(PreapprovalApi, BaseModel):
 
     objects = PreapprovalManager()
 
-    def __str__(self):
-        return "%s - %s" % (self.pk, self.short_description)
-
     class Meta(BaseModel.Meta):
         abstract = is_abstract('preapproval')
         db_table = 'djwepay_preapproval'
         verbose_name = 'WePay Preapproval'
+
+    def __str__(self):
+        return "%s - %s" % (self.pk, self.short_description)
+
 
 
 class Withdrawal(WithdrawalApi, BaseModel):
@@ -293,13 +233,14 @@ class Withdrawal(WithdrawalApi, BaseModel):
 
     objects = AccountObjectsManager()
 
-    def __str__(self):
-        return "%s - %s" % (self.pk, self.amount)
-
     class Meta(BaseModel.Meta):
         abstract = is_abstract('withdrawal')
         db_table = 'djwepay_withdrawal'
         verbose_name = 'WePay Preapproval'
+
+    def __str__(self):
+        return "%s - %s" % (self.pk, self.amount)
+
 
 
 class CreditCard(CreditCardApi, BaseModel):
@@ -313,13 +254,14 @@ class CreditCard(CreditCardApi, BaseModel):
     reference_id = models.CharField(max_length=255, blank=True)
     create_time = models.BigIntegerField(null=True)
 
-    def __str__(self):
-        return self.credit_card_name
-
     class Meta(BaseModel.Meta):
         abstract = is_abstract('credit_card')
         db_table = 'djwepay_credit_card'
         verbose_name = 'WePay Credit Card'
+
+    def __str__(self):
+        return self.credit_card_name
+
 
 
 class SubscriptionPlan(SubscriptionPlanApi, BaseModel):
@@ -347,15 +289,6 @@ class SubscriptionPlan(SubscriptionPlanApi, BaseModel):
         db_table = 'djwepay_subscription_plan'
         verbose_name = 'WePay Subscription Plan'
 
-
-class SubscriptionManager(models.Manager):
-
-    def create_from_response(self, subscription_plan, response):
-        obj = self.model(subscription_plan=subscription_plan)
-        return obj.instance_update(response)
-
-    def accessible(self):
-        return self.exclude(subscription_plan__account__user__access_token=None)
 
 
 class Subscription(SubscriptionApi, BaseModel):

@@ -6,29 +6,26 @@ from django.utils.functional import curry
 from djwepay.api import get_wepay_model
 from wepay.exceptions import WePayError
 
-from jsonfield.fields import JSONFormField, JSONWidget
-from jsonfield.utils import default
 
+#class JSONArrayWidget(forms.TextInput):
+#    def render(self, name, value, attrs=None):
+#        #if value is None:
+#        #    return ""
+#        if isinstance(value, basestring):
+#            value = ', '.join(json.loads(value))
+#        return super(JSONArrayWidget, self).render(name, value, attrs)
 
-class JSONArrayWidget(forms.TextInput):
-    def render(self, name, value, attrs=None):
-        #if value is None:
-        #    return ""
-        if isinstance(value, basestring):
-            value = ', '.join(json.loads(value))
-        return super(JSONArrayWidget, self).render(name, value, attrs)
+#class JSONArrayField(JSONFormField):
+#
+#    def __init__(self, *args, **kwargs):
+#        if 'widget' not in kwargs:
+#            kwargs['widget'] = JSONArrayWidget
+#        super(JSONArrayField, self).__init__(*args, **kwargs)
 
-class JSONArrayField(JSONFormField):
-
-    def __init__(self, *args, **kwargs):
-        if 'widget' not in kwargs:
-            kwargs['widget'] = JSONArrayWidget
-        super(JSONArrayField, self).__init__(*args, **kwargs)
-
-    def to_python(self, value):
-        #if value.strip():
-        #    value = "[%s]" % value
-        return super(JSONArrayField, self).to_python(value)
+#    def to_python(self, value):
+#        #if value.strip():
+#        #    value = "[%s]" % value
+#        return super(JSONArrayField, self).to_python(value)
 
 
 
@@ -59,10 +56,10 @@ class AppForm(forms.ModelForm):
         required=False, max_length=6, help_text="The hex triplet for the the "
         "color for primary action buttons.")
 
-    gaq_domains = JSONArrayField(
-        required=False, label="Google Analytics Domains",
-        help_text="Comma separated list of Google Analytics "
-        "domains associated with the app. Example: UA-23421-01, UA-23421-02")
+    #gaq_domains = JSONArrayField(
+    #    required=False, label="Google Analytics Domains",
+    #    help_text="Comma separated list of Google Analytics "
+    #    "domains associated with the app. Example: UA-23421-01, UA-23421-02")
 
     def __init__(self, *args, **kwargs):
         initial = kwargs.get('initial', {})

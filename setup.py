@@ -1,4 +1,4 @@
-from distutils.core import setup
+from setuptools import setup, find_packages
 import djwepay
 import os.path
 
@@ -9,13 +9,7 @@ long_description = open('README.rst').read() if os.path.isfile('README.rst') \
 setup(
     name='django-wepay',
     version=djwepay.get_version(),
-    packages=[
-        'djwepay',
-        'djwepay.backends',
-        'djwepay.management',
-        'djwepay.management.commands',
-        'djwepay.templatetags'
-    ],
+    packages=find_packages(),
     description=short_description,
     long_description=long_description,
     author='lehins',
@@ -24,10 +18,8 @@ setup(
     url='https://github.com/lehins/django-wepay',
     platforms=["any"],
     install_requires=[
-        'python-wepay>=1.2.3'
-    ],
-    dependency_links=[
-        'http://github.com/lehins/python-wepay/tarball/master#egg=python-wepay-1.2.3'
+        'python-wepay>=1.3.3',
+        'django-json-field>=0.5.5',
     ],
     classifiers=[
         'Development Status :: 4 - Beta',
