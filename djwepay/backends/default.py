@@ -53,18 +53,28 @@ class Call(calls.base.Call):
             return (processed, response)
 
 
+    def complete_uri(self, keyword, kwargs):
+        """Converts to full uri and updates kwargs"""
+        if keyword in kwargs:
+            uri = self._api.get_full_uri(kwargs[keyword])
+            kwargs[keyword] = uri
+            return uri
+        return None
+
+
+
 
 class OAuth2(Call, calls.OAuth2):
 
 
     def authorize(self, cleint_id, redirect_uri, scope, **kwargs):
         return super(OAuth2, self).authorize(
-            cleint_id, self.api.get_full_uri(redirect_uri), scope, **kwargs)
+            cleint_id, self._api.get_full_uri(redirect_uri), scope, **kwargs)
 
 
     def token(self, *args, **kwargs):
-        self.api.complete_uri('redirect_uri', kwargs)
-        self.api.complete_uri('callback_uri', kwargs)
+        self.complete_uri('redirect_uri', kwargs)
+        self.complete_uri('callback_uri', kwargs)
         return super(OAuth2, self).token(*args, **kwargs)
 
 
@@ -77,13 +87,13 @@ class App(Call, calls.App):
 class User(Call, calls.User):
 
     def modify(self, *args, **kwargs):
-        self.api.complete_uri('callback_uri', kwargs)
+        self.complete_uri('callback_uri', kwargs)
         return super(User, self).modify(*args, **kwargs)
 
 
     def register(self, *args, **kwargs):
-        self.api.complete_uri('redirect_uri', kwargs)
-        self.api.complete_uri('callback_uri', kwargs)
+        self.complete_uri('redirect_uri', kwargs)
+        self.complete_uri('callback_uri', kwargs)
         return super(User, self).register(*args, **kwargs)
 
 
@@ -91,19 +101,19 @@ class User(Call, calls.User):
 class Account(Call, calls.Account):
 
     def create(self, *args, **kwargs):
-        self.api.complete_uri('image_uri', kwargs)
-        self.api.complete_uri('callback_uri', kwargs)
+        self.complete_uri('image_uri', kwargs)
+        self.complete_uri('callback_uri', kwargs)
         return super(Account, self).create(*args, **kwargs)
 
 
     def modify(self, *args, **kwargs):
-        self.api.complete_uri('image_uri', kwargs)
-        self.api.complete_uri('callback_uri', kwargs)
+        self.complete_uri('image_uri', kwargs)
+        self.complete_uri('callback_uri', kwargs)
         return super(Account, self).modify(*args, **kwargs)
 
 
     def get_update_uri(self, *args, **kwargs):
-        self.api.complete_uri('redirect_uri', kwargs)
+        self.complete_uri('redirect_uri', kwargs)
         return super(Account, self).get_update_uri(*args, **kwargs)
 
 
@@ -111,14 +121,14 @@ class Account(Call, calls.Account):
 class Checkout(Call, calls.Checkout):
 
     def create(self, *args, **kwargs):
-        self.api.complete_uri('redirect_uri', kwargs)
-        self.api.complete_uri('callback_uri', kwargs)
-        self.api.complete_uri('fallback_uri', kwargs)
+        self.complete_uri('redirect_uri', kwargs)
+        self.complete_uri('callback_uri', kwargs)
+        self.complete_uri('fallback_uri', kwargs)
         return super(Checkout, self).create(*args, **kwargs)
 
 
     def modify(self, *args, **kwargs):
-        self.api.complete_uri('callback_uri', kwargs)
+        self.complete_uri('callback_uri', kwargs)
         return super(Checkout, self).modify(*args, **kwargs)
 
 
@@ -126,14 +136,14 @@ class Checkout(Call, calls.Checkout):
 class Preapproval(Call, calls.Preapproval):
 
     def create(self, *args, **kwargs):
-        self.api.complete_uri('redirect_uri', kwargs)
-        self.api.complete_uri('callback_uri', kwargs)
-        self.api.complete_uri('fallback_uri', kwargs)
+        self.complete_uri('redirect_uri', kwargs)
+        self.complete_uri('callback_uri', kwargs)
+        self.complete_uri('fallback_uri', kwargs)
         return super(Preapproval, self).create(*args, **kwargs)
 
 
     def modify(self, *args, **kwargs):
-        self.api.complete_uri('callback_uri', kwargs)
+        self.complete_uri('callback_uri', kwargs)
         return super(Preapproval, self).modify(*args, **kwargs)
 
 
@@ -141,14 +151,14 @@ class Preapproval(Call, calls.Preapproval):
 class Withdrawal(Call, calls.Withdrawal):
 
     def create(self, *args, **kwargs):
-        self.api.complete_uri('redirect_uri', kwargs)
-        self.api.complete_uri('callback_uri', kwargs)
-        self.api.complete_uri('fallback_uri', kwargs)
+        self.complete_uri('redirect_uri', kwargs)
+        self.complete_uri('callback_uri', kwargs)
+        self.complete_uri('fallback_uri', kwargs)
         return super(Withdrawal, self).create(*args, **kwargs)
 
 
     def modify(self, *args, **kwargs):
-        self.api.complete_uri('callback_uri', kwargs)
+        self.complete_uri('callback_uri', kwargs)
         return super(Withdrawal, self).modify(*args, **kwargs)
 
 
@@ -161,12 +171,12 @@ class CreditCard(Call, calls.CreditCard):
 class SubscriptionPlan(Call, calls.SubscriptionPlan):
 
     def create(self, *args, **kwargs):
-        self.api.complete_uri('callback_uri', kwargs)
+        self.complete_uri('callback_uri', kwargs)
         return super(SubscriptionPlan, self).create(*args, **kwargs)
 
 
     def modify(self, *args, **kwargs):
-        self.api.complete_uri('callback_uri', kwargs)
+        self.complete_uri('callback_uri', kwargs)
         return super(SubscriptionPlan, self).modify(*args, **kwargs)
 
 
@@ -174,14 +184,14 @@ class SubscriptionPlan(Call, calls.SubscriptionPlan):
 class Subscription(Call, calls.Subscription):
 
     def create(self, *args, **kwargs):
-        self.api.complete_uri('redirect_uri', kwargs)
-        self.api.complete_uri('callback_uri', kwargs)
+        self.complete_uri('redirect_uri', kwargs)
+        self.complete_uri('callback_uri', kwargs)
         return super(Subscription, self).create(*args, **kwargs)
 
 
     def modify(self, *args, **kwargs):
-        self.api.complete_uri('redirect_uri', kwargs)
-        self.api.complete_uri('callback_uri', kwargs)
+        self.complete_uri('redirect_uri', kwargs)
+        self.complete_uri('callback_uri', kwargs)
         return super(Subscription, self).modify(*args, **kwargs)
 
 
@@ -338,10 +348,3 @@ class WePay(PythonWePay):
         return '%s/login' % self.browser_uri
 
 
-    def complete_uri(self, keyword, kwargs):
-        """Converts to full uri and updates kwargs"""
-        if keyword in kwargs:
-            uri = self.get_full_uri(kwargs[keyword])
-            kwargs[keyword] = uri
-            return uri
-        return None
