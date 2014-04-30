@@ -1,5 +1,6 @@
 import copy
 
+from django.conf import settings
 from django.template.base import Node, token_kwargs, TemplateSyntaxError
 from django.template.defaulttags import register
 from django.utils import six
@@ -9,24 +10,27 @@ from djwepay.api import get_wepay_model, DEFAULT_SCOPE
 APP = get_wepay_model('app').objects.get_current()
 
 class AuthorizeNode(Node):
-    template = '<script src="%(browser_js)s" ' \
-               'type="text/javascript"></script><script type="text/javascript">' \
-               'function oauth2_authorize(){'\
-               'WePay.set_endpoint("%(endpoint)s"); ' \
-               'WePay.OAuth2.button_init(document.getElementById("%(elem_id)s"), {' \
-               '"client_id": "%(client_id)d",' \
-               '"scope": %(scope)r,' \
-               '"user_name": "%(user_name)s",' \
-               '"user_email": "%(user_email)s",' \
-               '"redirect_uri": "%(redirect_uri)s",' \
-               '"top": %(top)d,' \
-               '"left": %(left)d,' \
-               '"state": "%(state)s",' \
-               '"callback": %(callback)s });}' \
-               'if(window.addEventListener)' \
-               'window.addEventListener("load", oauth2_authorize);' \
-               'else window.attachEvent("onload", oauth2_authorize);' \
-               '</script>' \
+    template = """
+    <script src="%(browser_js)s" type="text/javascript"></script>
+    <script type="text/javascript">
+      function oauth2_authorize(){
+        WePay.set_endpoint("%(endpoint)s");
+        WePay.OAuth2.button_init(document.getElementById("%(elem_id)s"), {
+          "client_id": "%(client_id)d",
+          "scope": %(scope)r,
+          "user_name": "%(user_name)s",
+          "user_email": "%(user_email)s",
+          "redirect_uri": "%(redirect_uri)s",
+          "top": %(top)d,
+          "left": %(left)d,
+          "state": "%(state)s",
+          "callback": %(callback)s 
+        });
+      }
+      if(window.addEventListener) window.addEventListener("load", oauth2_authorize);
+      else window.attachEvent("onload", oauth2_authorize);
+    </script>
+    """
 
     default_params = {
         'browser_js': APP.api.browser_js,
@@ -57,14 +61,14 @@ class AuthorizeNode(Node):
                       six.iteritems(self.params))
         params = copy.copy(self.default_params)
         params.update(custom_params)
-        APP._api_uri_modifier(params, 'redirect_uri')
+        APP.api.app.complete_uri('redirect_uri', params)
         return self.template % params
         
         
 
 
-@register.tag('oauth2_authorize')
-def oauth2_authorize(parser, token):
+@register.tag('wepay_oauth2')
+def wepay_oauth2(parser, token):
     bits = token.contents.split()
     remaining_bits = bits[1:]
     params = token_kwargs(remaining_bits, parser, support_legacy=True)
@@ -77,3 +81,20 @@ def oauth2_authorize(parser, token):
         raise TemplateSyntaxError("%r received an invalid token: %r" %
                                   (bits[0], remaining_bits[0]))
     return AuthorizeNode(params)
+
+
+DEFAULT_TITLES = (
+    ('action_required', "Action Required"),
+    ('kyc', "Know Your Customer Information"),
+    ('bank_account', "Bank Account Information"),    
+)
+
+TITLES = dict(DEFAULT_TITLES + getattr(settings, 'WEPAY_TITLES', ()))
+
+@register.filter('wepay_title', safe=True)
+def wepay_title(value):
+    if not value:
+        return ''
+    return TITLES.get(value, None) or value.title()
+
+    

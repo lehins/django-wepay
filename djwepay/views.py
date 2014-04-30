@@ -117,9 +117,12 @@ class OAuth2Mixin(object):
                 self.request.GET['error'], 
                 self.request.GET.get('error_description', '')))
         try:
-            code = self.request.GET['code']
+            if self.request.method == 'POST':
+                code = self.request.POST.get('code')
+            else:
+                code = self.request.GET.get('code')
         except KeyError:
-            raise AttributeError("'code' is missing from GET parameters")
+            raise AttributeError("'code' is missing.")
         try:
             user, response = self.app.api_oauth2_token(
                 code=code, redirect_uri=self.get_redirect_uri(), **kwargs)
