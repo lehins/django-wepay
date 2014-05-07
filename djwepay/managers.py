@@ -2,6 +2,8 @@ from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.db import models
 
+from djwepay.api import get_wepay_model
+
 __all__ = [
     'AppManager', 'UserManager', 'AccountManager', 'AccountObjectsManager',
     'PreapprovalManager', 'SubscriptionManager'

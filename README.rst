@@ -108,5 +108,5 @@ Settings
 * ``WEPAY_THROTTLE_CALL_KEY`` - cache key for storing throttling info.
 * ``WEPAY_CACHE_BATCH_KEY_PREFIX`` - cache key prefix for storing batch calls
   and associated callbacks in cache, for later processing.
-* ``WEPAY_DOMAIN`` - your site's domain, if ``None`` will use django's `sites` app.
+* ``WEPAY_SITE_DOMAIN`` - your site's domain, if ``None`` will use django's `sites` app.
 

@@ -18,7 +18,7 @@ THROTTLE_CALL_LIMIT = getattr(settings, 'WEPAY_THROTTLE_CALL_LIMIT', 30)
 THROTTLE_TIMEOUT = getattr(settings, 'WEPAY_THROTTLE_TIMEOUT', 10)
 THROTTLE_CALL_KEY = getattr(settings, 'WEPAY_THROTTLE_CALL_KEY', 'wepay-throttle-call')
 BLOCKING_KEY = THROTTLE_CALL_KEY + '-blocked'
-DOMAIN = getattr(settings, 'WEPAY_DOMAIN', None)
+DOMAIN = getattr(settings, 'WEPAY_SITE_DOMAIN', None)
 
 BATCH_CALLS_CACHE = {}
 BATCH_CALLBACKS = {}
@@ -44,11 +44,11 @@ class Call(calls.base.Call):
             calls = BATCH_CALLS_CACHE.get(batch_key, [])
             calls.append(call)
             BATCH_CALLS_CACHE[batch_key] = calls
-            return None
+            return (None, call) # all api calls are expected to return a tuple
         else:
             response = super(Call, self).make_call(func, params, extra_kwargs)
             processed = None
-            if not callback is None and callable(callback):
+            if callback is not None and callable(callback):
                 processed = callback(response)
             return (processed, response)
 
@@ -334,9 +334,9 @@ class WePay(PythonWePay):
 
     def get_full_uri(self, uri):
         """
-        Used to build callback uri's. Make sure you have SITE_FULL_URL in
+        Used to build callback uri's. Make sure you have WEPAY_SITE_DOMAIN in
         settings or Site app enabled.
-        :param str last part of url
+        :param str uri: last part of url
         """
         return '%s%s' % (self.site_uri, uri)
 
