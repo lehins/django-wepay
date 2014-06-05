@@ -14,8 +14,12 @@ class AuthorizeNode(Node):
     <script src="%(browser_js)s" type="text/javascript"></script>
     <script type="text/javascript">
       function oauth2_authorize(){
+        if(document.documentMode && document.documentMode >= 10){ 
+          return false; // disable for gte IE10
+        }
         WePay.set_endpoint("%(endpoint)s");
-        WePay.OAuth2.button_init(document.getElementById("%(elem_id)s"), {
+        var button = document.getElementById("%(elem_id)s");
+        WePay.OAuth2.button_init(button, {
           "client_id": "%(client_id)d",
           "scope": %(scope)r,
           "user_name": "%(user_name)s",
@@ -26,6 +30,11 @@ class AuthorizeNode(Node):
           "state": "%(state)s",
           "callback": %(callback)s 
         });
+        if (window.addEventListener) {
+	  button.addEventListener("click", function(){return false;}, false);
+	} else if (window.attachEvent) {
+	  button.attachEvent("onclick", function(){return false;}, false);
+	}
       }
       if(window.addEventListener) window.addEventListener("load", oauth2_authorize);
       else window.attachEvent("onload", oauth2_authorize);
