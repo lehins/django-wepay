@@ -9,6 +9,8 @@ from djwepay.api import get_wepay_model, DEFAULT_SCOPE
 
 APP = get_wepay_model('app').objects.get_current()
 
+#TODO: remove jquery dependency from the tag.
+
 class AuthorizeNode(Node):
     template = """
     <script src="%(browser_js)s" type="text/javascript"></script>
@@ -19,6 +21,7 @@ class AuthorizeNode(Node):
         }
         WePay.set_endpoint("%(endpoint)s");
         var button = document.getElementById("%(elem_id)s");
+        $(button).click(function(event){event.preventDefault; return false;});
         WePay.OAuth2.button_init(button, {
           "client_id": "%(client_id)d",
           "scope": %(scope)r,
@@ -30,11 +33,6 @@ class AuthorizeNode(Node):
           "state": "%(state)s",
           "callback": %(callback)s 
         });
-        if (window.addEventListener) {
-	  button.addEventListener("click", function(){return false;}, false);
-	} else if (window.attachEvent) {
-	  button.attachEvent("onclick", function(){return false;}, false);
-	}
       }
       if(window.addEventListener) window.addEventListener("load", oauth2_authorize);
       else window.attachEvent("onload", oauth2_authorize);
