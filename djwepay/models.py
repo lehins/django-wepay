@@ -60,10 +60,10 @@ class App(AppApi, BaseModel):
     # Administrative objects attached to account, they are null=True just 
     # for initialization of the App, but are required for proper functionality.
     account = models.ForeignKey(
-        get_wepay_model_name('account'), related_name='apps', null=True,
+        get_wepay_model_name('account'), related_name='apps+', null=True,
         help_text="Account attached to App where you can collect money.")
     user = models.ForeignKey(
-        get_wepay_model_name('user'), related_name='apps', null=True,
+        get_wepay_model_name('user'), related_name='apps+', null=True,
         help_text="Owner of this App")
 
     client_secret = models.CharField(max_length=255)
@@ -81,7 +81,7 @@ class App(AppApi, BaseModel):
 class User(UserApi, BaseModel):
     user_id = models.BigIntegerField(primary_key=True)
     app = models.ForeignKey(
-        get_wepay_model_name('app'), related_name='users')
+        get_wepay_model_name('app'), related_name='users+', null=True)
     user_name = models.CharField(max_length=255)
     first_name = models.CharField(max_length=255)
     last_name = models.CharField(max_length=255)
@@ -108,7 +108,7 @@ class User(UserApi, BaseModel):
 class Account(AccountApi, BaseModel):
     account_id = models.BigIntegerField(primary_key=True)
     user = models.ForeignKey(
-        get_wepay_model_name('user'), related_name='accounts', null=True)
+        get_wepay_model_name('user'), related_name='accounts+', null=True)
     name = models.CharField(max_length=255)
     state = models.CharField(max_length=255)
     description = models.CharField(max_length=255)
@@ -138,9 +138,9 @@ class Account(AccountApi, BaseModel):
 class Checkout(CheckoutApi, BaseModel):
     checkout_id = models.BigIntegerField(primary_key=True)
     account = models.ForeignKey(
-        get_wepay_model_name('account'), related_name='checkouts')
+        get_wepay_model_name('account'), related_name='checkouts+')
     preapproval = models.ForeignKey(
-        get_wepay_model_name('preapproval'), related_name='checkouts', null=True)
+        get_wepay_model_name('preapproval'), related_name='checkouts+', null=True)
     state = models.CharField(max_length=255)
     soft_descriptor = models.CharField(max_length=255)
     short_description = models.CharField(max_length=255)
@@ -180,9 +180,9 @@ class Checkout(CheckoutApi, BaseModel):
 class Preapproval(PreapprovalApi, BaseModel):
     preapproval_id = models.BigIntegerField(primary_key=True)
     app = models.ForeignKey(
-        get_wepay_model_name('app'), null=True, related_name='preapprovals')
+        get_wepay_model_name('app'), null=True, related_name='preapprovals+')
     account = models.ForeignKey(
-        get_wepay_model_name('account'), null=True, related_name='preapprovals')
+        get_wepay_model_name('account'), null=True, related_name='preapprovals+')
     short_description = models.CharField(max_length=255)
     long_description = models.CharField(max_length=2047, blank=True)
     currency = "USD"
@@ -223,7 +223,7 @@ class Preapproval(PreapprovalApi, BaseModel):
 class Withdrawal(WithdrawalApi, BaseModel):
     withdrawal_id = models.BigIntegerField(primary_key=True)
     account = models.ForeignKey(
-        get_wepay_model_name('account'), related_name='withdrawals')
+        get_wepay_model_name('account'), related_name='withdrawals+')
     state = models.CharField(max_length=255)
     amount = MoneyField(null=True)
     note = models.CharField(max_length=255)
