@@ -4,7 +4,8 @@ from django import forms
 from django.utils.functional import curry
 
 from djwepay.api import get_wepay_model
-from wepay.exceptions import WePayError
+from djwepay.models import *
+from wepay.exceptions import WePayError, WePayConnectionError
 
 
 #class JSONArrayWidget(forms.TextInput):
@@ -131,3 +132,97 @@ class AccountCreateForm(forms.Form):
         if name.lower().rfind("wepay") >= 0:
             raise forms.ValidationError("Account name cannot contain 'wepay'.")
         return name
+
+
+
+
+class PreapprovalCancelForm(forms.Form):
+
+    def __init__(self, preapproval, refresh=True, *args, **kwargs):
+        self.preapproval = preapproval
+        self.refresh = refresh
+        super(PreapprovalCancelForm, self).__init__(*args, **kwargs)
+
+
+    def clean(self):
+        if self.refresh:
+            try:
+                self.preapproval.api_preapproval()
+            except WePayError as e:
+                raise forms.ValidationError(e.message)
+            except WePayConnectionError:
+                raise forms.ValidationError(
+                    "There was a problem connecting to WePay, please try again later")
+        if self.preapproval.state != 'approved':
+            raise forms.ValidationError("Cannot cancel preapproval that is not Approved")
+        return self.cleaned_data
+
+
+    def save(self, commit=True):
+        return self.preapproval.api_preapproval_cancel(commit=commit)
+
+
+
+class CheckoutCancelForm(forms.Form):
+    
+    cancel_reason = forms.CharField(
+        required=True, label="Cancel Reason", 
+        widget=forms.Textarea(attrs={'maxlength': 255}))
+
+    def __init__(self, checkout, refresh=True, *args, **kwargs):
+        self.checkout = checkout
+        self.refresh = refresh
+        super(CheckoutCancelForm, self).__init__(*args, **kwargs)
+
+
+    def clean(self):
+        if self.refresh:
+            try:
+                self.checkout.api_checkout()
+            except WePayError as e:
+                raise forms.ValidationError(e.message)
+            except WePayConnectionError:
+                raise forms.ValidationError(
+                    "There was a problem connecting to WePay, please try again later")
+        if not self.checkout.state in ['authorized', 'reserved']:
+            raise forms.ValidationError(
+                "Cannot cancel checkout that is in state: %s" % self.checkout.state)
+        return self.cleaned_data
+
+
+    def save(self, commit=True):
+        return self.checkout.api_checkout_cancel(
+            cancel_reason=self.cleaned_data['cancel_reason'], commit=commit)
+
+
+
+class CheckoutRefundForm(forms.Form):
+    
+    refund_reason = forms.CharField(
+        required=True, label="Refund Reason", 
+        widget=forms.Textarea(attrs={'maxlength': 255}))
+
+    def __init__(self, checkout, refresh=True, *args, **kwargs):
+        self.checkout = checkout
+        self.refresh = refresh
+        super(CheckoutRefundForm, self).__init__(*args, **kwargs)
+
+
+    def clean(self):
+        if self.refresh:
+            try:
+                self.checkout.api_checkout()
+            except WePayError as e:
+                raise forms.ValidationError(e.message)
+            except WePayConnectionError:
+                raise forms.ValidationError(
+                    "There was a problem connecting to WePay, please try again later")
+        if self.checkout.state != 'captured':
+            raise forms.ValidationError(
+                "Cannot refund checkout that is in state: %s" % self.checkout.state)
+        return self.cleaned_data
+
+
+    def save(self, commit=True):
+        return self.checkout.api_checkout_refund(
+            refund_reason=self.cleaned_data['refund_reason'], commit=commit)

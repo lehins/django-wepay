@@ -214,9 +214,9 @@ class Batch(Call, calls.Batch):
             response = call['response']
             processed = None
             if 'error' in response:
-                call['error'] = WePayError(response['error'],
-                                           response['error_description'],
-                                           response['error_code'])
+                processed = WePayError(response['error'],
+                                       response['error_description'],
+                                       response['error_code'])
             elif not reference_id is None:
                 callback_key = make_callback_key(batch_key, reference_id)
                 callbacks = BATCH_CALLBACKS.get(batch_key, None)

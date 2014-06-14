@@ -469,7 +469,7 @@ class PreapprovalApi(Api):
             callback=curry(self.instance_update, commit=commit), **kwargs)
 
 
-    def api_checkout_create(self, account=None, **kwargs):
+    def api_checkout_create(self, account=None, commit=True, **kwargs):
         """Create a checkout using this preapproval. In case that preapproval
         was authorized to send money to any account, account instance should be
         supplied as a keyword argument.
@@ -482,6 +482,7 @@ class PreapprovalApi(Api):
         return self.api.checkout.create(
             account_id=account.pk,
             access_token=account.access_token,
+            preapproval_id=self.pk,
             callback_uri=self.get_callback_uri(
                 obj_name='checkout', user_id=account.user.pk),
             callback=curry(Checkout.objects.create_from_response, account, commit=commit),
