@@ -81,7 +81,7 @@ class App(AppApi, BaseModel):
 class User(UserApi, BaseModel):
     user_id = models.BigIntegerField(primary_key=True)
     app = models.ForeignKey(
-        get_wepay_model_name('app'), related_name='users')
+        get_wepay_model_name('app'), related_name='users', null=True)
     user_name = models.CharField(max_length=255)
     first_name = models.CharField(max_length=255)
     last_name = models.CharField(max_length=255)
@@ -122,6 +122,20 @@ class Account(AccountApi, BaseModel):
     action_reasons = JSONField(null=True, blank=True)
     country = models.CharField(max_length=2)
     currencies = JSONField(null=True, blank=True)
+    reserved_amount = MoneyField(null=True)
+    withdrawals_schedule = JSONField(null=True, blank=True)
+    
+    def _get_owner_user_id(self):
+        return self.user_id
+
+    def _set_owner_user_id(self, value):
+        if self.user is None or self.user_id != value:
+            try:
+                user = User.objects.get(user_id=value)
+                self.user = user
+            except User.DoesNotExist: pass
+
+    owner_user_id = property(_get_owner_user_id, _set_owner_user_id)
 
     objects = AccountManager()
 
@@ -230,6 +244,7 @@ class Withdrawal(WithdrawalApi, BaseModel):
     recipient_confirmed = models.NullBooleanField()
     type = models.CharField(max_length=255)
     create_time = models.BigIntegerField(null=True)
+    capture_time = models.BigIntegerField(null=True)
 
     objects = AccountObjectsManager()
 

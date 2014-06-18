@@ -114,17 +114,17 @@ class AppForm(forms.ModelForm):
 
 
 ACCOUNT_TYPE_CHOICES = (
-    ('personal', u"Personal"),
-    ('nonprofit', u"Non-profit Organization"),
-    ('business', u"Business"),
+    ('personal', "Personal"),
+    ('nonprofit', "Non-profit Organization"),
+    ('business', "Business"),
 )
 
 class AccountCreateForm(forms.Form):
     name = forms.CharField(max_length=255, required=True, label="Account Name",
-                           help_text=u"The name of the account you want to create.")
+                           help_text="Name of the account you want to create.")
     description = forms.CharField(
-        max_length=255, required=True, help_text=u"The description of the account "
-        "you want to create.", widget=forms.Textarea)
+        max_length=255, required=True, help_text="Description of the account "
+        "you want to create.", widget=forms.Textarea(attrs={'maxlength': 255}))
     type = forms.ChoiceField(required=False, choices=ACCOUNT_TYPE_CHOICES)
 
     def clean_name(self):
@@ -133,6 +133,36 @@ class AccountCreateForm(forms.Form):
             raise forms.ValidationError("Account name cannot contain 'wepay'.")
         return name
 
+
+
+class AccountEditForm(forms.ModelForm):
+    name = forms.CharField(max_length=255, required=True, label="Account Name",
+                           help_text="Name of the WePay account.")
+    description = forms.CharField(
+        max_length=255, required=True, help_text="Description of the account.", 
+        widget=forms.Textarea(attrs={'maxlength': 255}))
+
+    class Meta:
+        model = get_wepay_model('account')
+        fields = (
+            'name', 'description'
+        )
+
+    def __init__(self, account, *args, **kwargs):
+        self.account = account
+        kwargs['instance'] = account
+        super(AccountEditForm, self).__init__(*args, **kwargs)
+    
+
+    def clean_name(self):
+        name = self.cleaned_data['name']
+        if name.lower().rfind("wepay") >= 0:
+            raise forms.ValidationError("Account name cannot contain 'wepay'.")
+        return name
+
+
+    def save(self, commit=True):
+        return self.account.api_account_modify(commit=commit, **self.cleaned_data)
 
 
 

@@ -206,6 +206,11 @@ class AppApi(Api):
 
 class UserApi(Api):
 
+    @cached_property
+    def callback_uri(self):
+        return self.api_user()[1].get('callback_uri', None)
+
+
     def api_user(self, commit=True, **kwargs):
         return self.api.user(
             access_token=self.access_token,
@@ -237,6 +242,8 @@ class UserApi(Api):
         return self.api.account.find(
             access_token=self.access_token, **kwargs)
 
+
+
 class AccountApi(Api):
 
     @cached_property
@@ -248,6 +255,11 @@ class AccountApi(Api):
     @cached_property
     def uri(self):
         return self.api_account_get_update_uri()[1].get('uri', None)
+
+
+    @cached_property
+    def callback_uri(self):
+        return self.api_account()[1].get('callback_uri', None)
 
 
     def api_account(self, commit=True, **kwargs):
@@ -284,11 +296,11 @@ class AccountApi(Api):
             callback=curry(self.instance_update, commit=commit), **kwargs)
 
 
-    def api_account_get_reserve_details(self, **kwargs):
-        return self.api.account.getreserve_details(
+    def api_account_get_reserve_details(self, commit=True, **kwargs):
+        return self.api.account.get_reserve_details(
             account_id=self.pk,
             access_token=self.access_token,
-            callback=self.instance_identity, **kwargs)
+            callback=curry(self.instance_update, commit=commit), **kwargs)
 
 
     def api_checkout_create(self, commit=True, **kwargs):
