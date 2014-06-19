@@ -69,8 +69,8 @@ class WePayLazy(LazyObject):
     def _setup(self):
         backend = from_string_import(API_BACKEND)
         app = get_wepay_model('app').objects.get_current()
-        self._wrapped = backend(
-            production=app.production, access_token=app.access_token)
+        self._wrapped = backend(production=getattr(settings, 'WEPAY_PRODUCTION', False), 
+                                access_token=app.access_token)
 
 
 

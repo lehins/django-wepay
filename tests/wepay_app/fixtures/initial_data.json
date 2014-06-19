@@ -1,0 +1,89 @@
+[
+		{
+				"pk": 321654987,
+				"model": "wepay_app.WePayUser",
+				"fields": {
+						"date_created": "2014-06-19 14:32:15",
+						"date_modified": "2014-06-19 14:32:15",
+						"user_name": "Ivan Susanin",
+						"first_name": "Ivan",
+						"last_name": "Susanin",
+						"email": "ivan.susanin@dominino.ru",
+						"state": "registered",
+						"access_token": "PRODUCTION_ed74070c6e8bfa49d346cdfee6191b03c2c2d9c9cda9184"
+				}
+		},
+		{
+				"pk": 54321,
+				"model": "wepay_app.WePayAccount",
+				"fields": {
+						"date_created": "2014-06-19 14:32:15",
+						"date_modified": "2014-06-19 14:32:15",
+						"user": 321654987,
+						"name": "Django Wepay SDK Testing App",
+						"state": "active",
+						"description": "Django Wepay account for testing",
+						"gaq_domains":  [
+								"UA-23421-01",
+								"UA-23421-02"
+						],
+						"theme_object": {
+								"name":"API Theme for API App: My Sample Application",
+								"primary_color":"FFFFFF",
+								"secondary_color":"000000",
+								"background_color":"004C64",
+								"button_color":"0084A0"
+						},
+						"type": "business",
+						"create_time": 1367958263,
+						"balances": [
+								{
+										"currency": "USD",
+										"balance": 390.50,
+										"incoming_pending_amount": 635.30,
+										"outgoing_pending_amount": 210.00,
+										"reserved_amount": 0,
+										"disputed_amount": 0,
+										"withdrawal_period": "daily",
+										"withdrawal_next_time": 1370112217,
+										"withdrawal_bank_name": "New Mexico Educators XXXXX3102"
+								}
+						],
+						"statuses": [
+								{
+										"currency": "USD",
+										"incoming_payments_status": "ok",
+										"outgoing_payments_status": "ok"
+								}
+						],
+						"action_reasons": [],
+						"country": "US",
+						"currencies": ["USD"]  
+				}
+		},
+		{
+				"pk": 12345,
+				"model": "wepay_app.WePayApp",
+				"fields": {
+						"date_created": "2014-06-19 14:32:15",
+						"date_modified": "2014-06-19 14:32:15",
+						"status": "approved",
+						"state": "active",
+						"api_version": "2014-01-08",
+						"theme_object": {
+								"name":"API Theme for API App: My Sample Application",
+								"primary_color":"FFFFFF",
+								"secondary_color":"000000",
+								"background_color":"004C64",
+								"button_color":"0084A0"
+						},
+						"gaq_domains":  [
+								"UA-23421-01",
+								"UA-23421-02"
+						],
+						"account": 54321,
+						"user": 321654987,
+						"client_secret": "1a2b3c4e5f"
+				}
+		}
+]

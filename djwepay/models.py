@@ -18,15 +18,17 @@ from djwepay.managers import *
 
 from json_field import JSONField
 
-__all__ = ['App', 'User', 'Account', 'Checkout', 'Preapproval', 'Withdrawal',
-           'CreditCard']
+__all__ = [
+    'App', 'User', 'Account', 'Checkout', 'Preapproval', 'Withdrawal',
+    'CreditCard', 'SubscriptionPlan', 'Subscription', 'SubscriptionCharge',
+    'get_wepay_model_name', 'get_wepay_model'
+]
 
 
 
 class BaseModel(models.Model):
 
     date_created  = models.DateTimeField(auto_now_add=True)
-
     date_modified = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -122,8 +124,6 @@ class Account(AccountApi, BaseModel):
     action_reasons = JSONField(null=True, blank=True)
     country = models.CharField(max_length=2)
     currencies = JSONField(null=True, blank=True)
-    reserved_amount = MoneyField(null=True)
-    withdrawals_schedule = JSONField(null=True, blank=True)
     
     def _get_owner_user_id(self):
         return self.user_id
