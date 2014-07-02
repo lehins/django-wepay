@@ -1,0 +1,1 @@
+from djwepay.backends.default import WePay

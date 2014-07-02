@@ -278,7 +278,7 @@ class WePay(PythonWePay):
     def __init__(self, **kwargs):
         domain = DOMAIN
         if domain is None:
-            domain = str(Site.objects.get_current())
+            domain = Site.objects.get_current().domain
         self.site_uri = "https://%s" % domain
         kwargs['timeout'] = kwargs.get('timeout', 45)
         super(WePay, self).__init__(**kwargs)

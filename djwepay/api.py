@@ -79,7 +79,7 @@ class Api(object):
     api = WePayLazy()
 
     def instance_update(self, response, commit=True):
-        is_new = False
+        has_state_changed = False
         previous_state = getattr(self, 'state', '')
         new_state = response.get('state', '')
         for key, value in response.iteritems():
@@ -92,16 +92,16 @@ class Api(object):
             # which has a chance of happening in multithreaded environment
             cache_key = "wepay-state-changed-%s-%s" % (type(self).__name__, self.pk)
             added = cache.add(cache_key, new_state)
-            is_new = True
+            has_state_changed = True
             if not added:
                 stored_state = cache.get(cache_key)
                 if stored_state == new_state:
-                    is_new = False
+                    has_state_changed = False
                 cache.set(cache_key, new_state)
         if commit:
             self.save()
-        if is_new:
-            state_changed.send(sender=type(self), instance=self,
+        if has_state_changed:
+            state_changed.send(sender=self.__class__, instance=self,
                                previous_state=previous_state)
         return self
 
@@ -126,17 +126,25 @@ class AppApi(Api):
 
 
     def api_app(self, commit=True, **kwargs):
-        return self.api.app(
+        app, response = self.api.app(
             client_id=self.client_id,
             client_secret=self.client_secret,
             callback=curry(self.instance_update, commit=commit), **kwargs)
+        if commit: # clear cached in case current app has changed
+            App = get_wepay_model('app')
+            App.objects.clear_cache()
+        return app, response
 
 
     def api_app_modify(self, commit=True, **kwargs):
-        return self.api.app.modify(
+        app, response = self.api.app.modify(
             client_id=self.client_id,
             client_secret=self.client_secret,
             callback=curry(self.instance_update, commit=commit), **kwargs)
+        if commit: # clear cached in case current app has changed
+            App = get_wepay_model('app')
+            App.objects.clear_cache()
+        return app, response
 
 
     def api_oauth2_authorize(self, redirect_uri, **kwargs):

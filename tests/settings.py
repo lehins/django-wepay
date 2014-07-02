@@ -36,6 +36,8 @@ WEPAY_DEBUG = DEBUG
 
 WEPAY_THROTTLE_PROTECT = True
 
+WEPAY_API_BACKEND = 'wepay_app.backends.TestWePay'
+
 WEPAY_MODELS = (
     ('app', 'wepay_app.WePayApp'),
     ('user', 'wepay_app.WePayUser'),
