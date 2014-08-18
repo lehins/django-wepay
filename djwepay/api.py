@@ -4,10 +4,11 @@ from django.core.urlresolvers import reverse
 from django.db.models.loading import get_model
 from django.utils.functional import LazyObject, curry
 
-from djwepay.decorators import cached_property
 from djwepay.signals import state_changed
 from djwepay.utils import from_string_import
 from wepay.exceptions import WePayError
+from wepay.utils import cached_property
+
 
 __all__ = ['AppApi', 'UserApi', 'AccountApi', 'CheckoutApi', 'PreapprovalApi',
            'WithdrawalApi', 'CreditCardApi', 'SubscriptionPlanApi',
@@ -276,7 +277,7 @@ class AccountApi(Api):
                 account_id=self.pk,
                 access_token=self.access_token,
                 callback=curry(self.instance_update, commit=commit), **kwargs)
-        except WePayError, e:
+        except WePayError as e:
             if e.code == 3003: # The account has been deleted
                 self.state = 'deleted'
                 self.save()

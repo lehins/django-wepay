@@ -4,9 +4,9 @@ from django.contrib.sites.models import Site
 from django.core.cache import cache
 
 from djwepay.utils import make_batch_key, make_callback_key
-from wepay import WePay as PythonWePay
-from wepay import calls
+from wepay import calls, WePay as PythonWePay
 from wepay.exceptions import WePayError
+from wepay.utils import cached_property
 
 
 __all__ = ['WePay']
@@ -19,6 +19,7 @@ THROTTLE_TIMEOUT = getattr(settings, 'WEPAY_THROTTLE_TIMEOUT', 10)
 THROTTLE_CALL_KEY = getattr(settings, 'WEPAY_THROTTLE_CALL_KEY', 'wepay-throttle-call')
 BLOCKING_KEY = THROTTLE_CALL_KEY + '-blocked'
 DOMAIN = getattr(settings, 'WEPAY_SITE_DOMAIN', None)
+
 
 BATCH_CALLS_CACHE = {}
 BATCH_CALLBACKS = {}
@@ -53,13 +54,11 @@ class Call(calls.base.Call):
             return (processed, response)
 
 
-    def complete_uri(self, keyword, kwargs):
+    def complete_uris(self, names, kwargs):
         """Converts to full uri and updates kwargs"""
-        if keyword in kwargs:
-            uri = self._api.get_full_uri(kwargs[keyword])
-            kwargs[keyword] = uri
-            return uri
-        return None
+        for name in names:
+            if name in kwargs:
+                kwargs[name] = self._api.get_full_uri(kwargs[name])
 
 
 
@@ -73,8 +72,7 @@ class OAuth2(Call, calls.OAuth2):
 
 
     def token(self, *args, **kwargs):
-        self.complete_uri('redirect_uri', kwargs)
-        self.complete_uri('callback_uri', kwargs)
+        self.complete_uris(['redirect_uri', 'callback_uri'], kwargs)
         return super(OAuth2, self).token(*args, **kwargs)
 
 
@@ -87,13 +85,12 @@ class App(Call, calls.App):
 class User(Call, calls.User):
 
     def modify(self, *args, **kwargs):
-        self.complete_uri('callback_uri', kwargs)
+        self.complete_uris(['callback_uri'], kwargs)
         return super(User, self).modify(*args, **kwargs)
 
 
     def register(self, *args, **kwargs):
-        self.complete_uri('redirect_uri', kwargs)
-        self.complete_uri('callback_uri', kwargs)
+        self.complete_uris(['redirect_uri', 'callback_uri'], kwargs)
         return super(User, self).register(*args, **kwargs)
 
 
@@ -101,19 +98,17 @@ class User(Call, calls.User):
 class Account(Call, calls.Account):
 
     def create(self, *args, **kwargs):
-        self.complete_uri('image_uri', kwargs)
-        self.complete_uri('callback_uri', kwargs)
+        self.complete_uris(['image_uri', 'callback_uri'], kwargs)
         return super(Account, self).create(*args, **kwargs)
 
 
     def modify(self, *args, **kwargs):
-        self.complete_uri('image_uri', kwargs)
-        self.complete_uri('callback_uri', kwargs)
+        self.complete_uris(['image_uri', 'callback_uri'], kwargs)
         return super(Account, self).modify(*args, **kwargs)
 
 
     def get_update_uri(self, *args, **kwargs):
-        self.complete_uri('redirect_uri', kwargs)
+        self.complete_uris(['redirect_uri'], kwargs)
         return super(Account, self).get_update_uri(*args, **kwargs)
 
 
@@ -121,14 +116,13 @@ class Account(Call, calls.Account):
 class Checkout(Call, calls.Checkout):
 
     def create(self, *args, **kwargs):
-        self.complete_uri('redirect_uri', kwargs)
-        self.complete_uri('callback_uri', kwargs)
-        self.complete_uri('fallback_uri', kwargs)
+        self.complete_uris(
+            ['redirect_uri', 'callback_uri', 'fallback_uri'], kwargs)
         return super(Checkout, self).create(*args, **kwargs)
 
 
     def modify(self, *args, **kwargs):
-        self.complete_uri('callback_uri', kwargs)
+        self.complete_uris(['callback_uri'], kwargs)
         return super(Checkout, self).modify(*args, **kwargs)
 
 
@@ -136,14 +130,13 @@ class Checkout(Call, calls.Checkout):
 class Preapproval(Call, calls.Preapproval):
 
     def create(self, *args, **kwargs):
-        self.complete_uri('redirect_uri', kwargs)
-        self.complete_uri('callback_uri', kwargs)
-        self.complete_uri('fallback_uri', kwargs)
+        self.complete_uris(
+            ['redirect_uri', 'callback_uri', 'fallback_uri'], kwargs)
         return super(Preapproval, self).create(*args, **kwargs)
 
 
     def modify(self, *args, **kwargs):
-        self.complete_uri('callback_uri', kwargs)
+        self.complete_uris(['callback_uri'], kwargs)
         return super(Preapproval, self).modify(*args, **kwargs)
 
 
@@ -151,14 +144,13 @@ class Preapproval(Call, calls.Preapproval):
 class Withdrawal(Call, calls.Withdrawal):
 
     def create(self, *args, **kwargs):
-        self.complete_uri('redirect_uri', kwargs)
-        self.complete_uri('callback_uri', kwargs)
-        self.complete_uri('fallback_uri', kwargs)
+        self.complete_uris(
+            ['redirect_uri', 'callback_uri', 'fallback_uri'], kwargs)
         return super(Withdrawal, self).create(*args, **kwargs)
 
 
     def modify(self, *args, **kwargs):
-        self.complete_uri('callback_uri', kwargs)
+        self.complete_uris(['callback_uri'], kwargs)
         return super(Withdrawal, self).modify(*args, **kwargs)
 
 
@@ -171,12 +163,12 @@ class CreditCard(Call, calls.CreditCard):
 class SubscriptionPlan(Call, calls.SubscriptionPlan):
 
     def create(self, *args, **kwargs):
-        self.complete_uri('callback_uri', kwargs)
+        self.complete_uris(['callback_uri'], kwargs)
         return super(SubscriptionPlan, self).create(*args, **kwargs)
 
 
     def modify(self, *args, **kwargs):
-        self.complete_uri('callback_uri', kwargs)
+        self.complete_uris(['callback_uri'], kwargs)
         return super(SubscriptionPlan, self).modify(*args, **kwargs)
 
 
@@ -184,14 +176,12 @@ class SubscriptionPlan(Call, calls.SubscriptionPlan):
 class Subscription(Call, calls.Subscription):
 
     def create(self, *args, **kwargs):
-        self.complete_uri('redirect_uri', kwargs)
-        self.complete_uri('callback_uri', kwargs)
+        self.complete_uris(['redirect_uri', 'callback_uri'], kwargs)
         return super(Subscription, self).create(*args, **kwargs)
 
 
     def modify(self, *args, **kwargs):
-        self.complete_uri('redirect_uri', kwargs)
-        self.complete_uri('callback_uri', kwargs)
+        self.complete_uris(['redirect_uri', 'callback_uri'], kwargs)
         return super(Subscription, self).modify(*args, **kwargs)
 
 
@@ -214,9 +204,8 @@ class Batch(Call, calls.Batch):
             response = call['response']
             processed = None
             if 'error' in response:
-                processed = WePayError(response['error'],
-                                       response['error_description'],
-                                       response['error_code'])
+                processed = WePayError(response['error'], response['error_code'],
+                                       response['error_description'])
             elif not reference_id is None:
                 callback_key = make_callback_key(batch_key, reference_id)
                 callbacks = BATCH_CALLBACKS.get(batch_key, None)
@@ -270,11 +259,6 @@ class Batch(Call, calls.Batch):
 
 class WePay(PythonWePay):
 
-    supported_calls = [
-        OAuth2, App, User, Account, Checkout, Preapproval, Withdrawal, CreditCard,
-        SubscriptionPlan, Subscription, SubscriptionCharge, Batch
-    ]
-
     def __init__(self, **kwargs):
         domain = DOMAIN
         if domain is None:
@@ -282,6 +266,66 @@ class WePay(PythonWePay):
         self.site_uri = "https://%s" % domain
         kwargs['timeout'] = kwargs.get('timeout', 45)
         super(WePay, self).__init__(**kwargs)
+
+
+    @cached_property
+    def oauth2(self):
+        return OAuth2(self)
+ 
+
+    @cached_property
+    def app(self):
+        return App(self)
+
+
+    @cached_property
+    def user(self):
+        return User(self)
+        
+
+    @cached_property
+    def account(self):
+       return Account(self)
+
+
+    @cached_property
+    def checkout(self):
+        return Checkout(self)
+
+
+    @cached_property
+    def preapproval(self):
+        return Preapproval(self)
+
+
+    @cached_property
+    def withdrawal(self):
+        return Withdrawal(self)
+
+
+    @cached_property
+    def credit_card(self):
+        return CreditCard(self)
+
+
+    @cached_property
+    def subscription_plan(self):
+        return SubscriptionPlan(self)
+
+
+    @cached_property
+    def subscription(self):
+       return Subscription(self)
+
+
+    @cached_property
+    def subscription_charge(self):
+        return SubscriptionCharge(self)
+
+
+    @cached_property
+    def batch(self):
+        return Batch(self)
 
 
     def _log_error(self, error, uri, params):
@@ -324,7 +368,7 @@ class WePay(PythonWePay):
                 response = self._call_protected(uri, **kwargs)
             else:
                 response = super(WePay, self).call(uri, **kwargs)
-        except WePayError, e:
+        except WePayError as e:
             self._log_error(e, uri, kwargs.get('params', {}))
             raise
         if DEBUG:
@@ -335,7 +379,7 @@ class WePay(PythonWePay):
     def get_full_uri(self, uri):
         """
         Used to build callback uri's. Make sure you have WEPAY_SITE_DOMAIN in
-        settings or Site app enabled.
+        settings or Site app enabled and configured.
         :param str uri: last part of url
         """
         return '%s%s' % (self.site_uri, uri)
@@ -346,5 +390,4 @@ class WePay(PythonWePay):
         Returns WePay login url. Just in case if someone needs it.
         """
         return '%s/login' % self.browser_uri
-
 
