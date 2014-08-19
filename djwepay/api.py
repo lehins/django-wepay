@@ -277,8 +277,8 @@ class AccountApi(Api):
                 account_id=self.pk,
                 access_token=self.access_token,
                 callback=curry(self.instance_update, commit=commit), **kwargs)
-        except WePayError as e:
-            if e.code == 3003: # The account has been deleted
+        except WePayError as exc:
+            if exc.error_code == 3003: # The account has been deleted
                 self.state = 'deleted'
                 self.save()
             raise
