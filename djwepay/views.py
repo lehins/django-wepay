@@ -49,7 +49,7 @@ class IPNView(View):
         try:
             api_call = getattr(obj, "api_%s" % obj_name)
             api_call()
-        except WePayError, exc:
+        except WePayError as exc:
             if exc.error_code == 1011 and user is not None:
                 # acess_token has been revoked, reflect it in db
                 user.access_token = None
@@ -127,7 +127,7 @@ class OAuth2Mixin(object):
             user, response = self.app.api_oauth2_token(
                 code=code, redirect_uri=self.get_redirect_uri(), **kwargs)
             return user
-        except WePayError, exc:
+        except WePayError as exc:
             if exc.error_code == 1012: # the code has expired
                 raise AttributeError(str(e))
             raise

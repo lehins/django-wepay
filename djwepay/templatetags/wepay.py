@@ -68,7 +68,7 @@ class AuthorizeNode(Node):
                       six.iteritems(self.params))
         params = copy.copy(self.default_params)
         params.update(custom_params)
-        APP.api.app.complete_uri('redirect_uri', params)
+        APP.api.app.complete_uris(['redirect_uri'], params)
         return self.template % params
         
         
