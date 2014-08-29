@@ -69,7 +69,6 @@ class App(AppApi, BaseModel):
         help_text="Owner of this App")
 
     client_secret = models.CharField(max_length=255)
-    production = models.BooleanField(default=True)
 
     objects = AppManager()
 

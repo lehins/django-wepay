@@ -38,7 +38,6 @@ DEFAULT_MODELS = dict([
 
 MODELS = dict(getattr(settings, 'WEPAY_MODELS', ()))
 
-
 API_BACKEND = getattr(settings, 'WEPAY_API_BACKEND', 'djwepay.backends.default.WePay')
 
 

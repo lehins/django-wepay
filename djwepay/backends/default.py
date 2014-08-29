@@ -13,7 +13,7 @@ __all__ = ['WePay']
 
 DEBUG = getattr(settings, 'WEPAY_DEBUG', getattr(settings, 'DEBUG'))
 
-THROTTLE_PROTECT = getattr(settings, 'WEPAY_THROTTLE_PROTECT', False)
+THROTTLE_PROTECT = getattr(settings, 'WEPAY_THROTTLE_PROTECT', True)
 THROTTLE_CALL_LIMIT = getattr(settings, 'WEPAY_THROTTLE_CALL_LIMIT', 30)
 THROTTLE_TIMEOUT = getattr(settings, 'WEPAY_THROTTLE_TIMEOUT', 10)
 THROTTLE_CALL_KEY = getattr(settings, 'WEPAY_THROTTLE_CALL_KEY', 'wepay-throttle-call')

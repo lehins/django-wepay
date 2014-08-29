@@ -7,8 +7,8 @@ __all__ = ['AppAdmin', 'UserAdmin', 'AccountAdmin']
 
 
 class AppAdmin(admin.ModelAdmin):
-    list_display = ('client_id', 'user', 'account', 'status', 'state', 'production')
-    list_filter = ('status', 'state', 'production', 'date_created')
+    list_display = ('client_id', 'user', 'account', 'status', 'state')
+    list_filter = ('status', 'state', 'date_created')
     search_fields = ('state', 'status', 'theme_object', 'gaq_domain')
     form = AppForm
 
