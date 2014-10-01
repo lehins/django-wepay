@@ -21,9 +21,9 @@ BLOCKING_KEY = THROTTLE_CALL_KEY + '-blocked'
 DOMAIN = getattr(settings, 'WEPAY_SITE_DOMAIN', None)
 
 
+BATCH_CALLS_NUMBER = getattr(settings, 'WEPAY_BATCH_CALLS_NUMBER', 50)
 BATCH_CALLS_CACHE = {}
 BATCH_CALLBACKS = {}
-
 
 
 class Call(calls.base.Call):
@@ -219,20 +219,28 @@ class Batch(Call, calls.Batch):
         return processed_calls
 
 
-    def create(self, batch_id, client_id, client_secret, **kwargs):
-        """Retrieves queued calls, sequentially sends /batch/create API calls
-        in chunks of up to 50 and then processes any callbacks set.
+    def create(self, batch_id, client_id, client_secret, max_calls=None, **kwargs):
+        """Retrieves queued calls, sequentially sends /batch/create API calls in
+        chunks of up to `max_calls`, which defaults to
+        `WEPAY_BATCH_CALLS_NUMBER` setting and then processes any callbacks
+        set. Consider raising `timeout` kwarg, since batch calls can take a
+        while, also if you start getting HTTP 404 errors, try lowering
+        `max_calls` value.
 
         """
+        max_calls = max_calls or BATCH_CALLS_NUMBER
+        assert 0 < max_calls and max_calls <= 50, \
+            """max_calls should be a positive number no greater then 50, it is
+            also WePay's limitation"""
         batch_key = make_batch_key(batch_id)
         calls = BATCH_CALLS_CACHE.get(batch_key)
         calls_response = []
         while calls:
-            cur_calls = calls[:50]
+            cur_calls = calls[:max_calls]
             response = super(Batch, self).create(
                 client_id, client_secret, cur_calls, **kwargs)[1]
             calls_response.extend(response['calls'])
-            calls = calls[50:]
+            calls = calls[max_calls:]
         response = (None, {'calls': self.process_calls(batch_key, calls_response)})
         self.del_calls(batch_id)
         return response
