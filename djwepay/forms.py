@@ -120,12 +120,12 @@ ACCOUNT_TYPE_CHOICES = (
 )
 
 class AccountCreateForm(forms.Form):
-    name = forms.CharField(max_length=255, required=True, label="Account Name",
-                           help_text="Name of the account you want to create.")
+    name = forms.CharField(max_length=255, required=True, label="WePay Account Name",
+                           help_text="Name of the WePay Account you want to create.")
     description = forms.CharField(
-        max_length=255, required=True, help_text="Description of the account "
+        max_length=255, required=True, help_text="Description of the WePay Account "
         "you want to create.", widget=forms.Textarea(attrs={'maxlength': 255}))
-    type = forms.ChoiceField(required=False, choices=ACCOUNT_TYPE_CHOICES)
+    type = forms.ChoiceField(required=True, choices=ACCOUNT_TYPE_CHOICES)
 
     def clean_name(self):
         name = self.cleaned_data['name']
