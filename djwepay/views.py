@@ -6,7 +6,7 @@ from django.views.generic.base import View
 
 from djwepay.signals import ipn_processed
 from djwepay.api import get_wepay_model
-from wepay.exceptions import WePayError
+from wepay.exceptions import WePayHTTPError
 
 __all__ = ['IPNView', 'OAuth2Mixin']
 
@@ -49,14 +49,14 @@ class IPNView(View):
         try:
             api_call = getattr(obj, "api_%s" % obj_name)
             api_call()
-        except WePayError as exc:
+        except WePayHTTPError as exc:
             if exc.error_code == 1011 and user is not None:
                 # acess_token has been revoked, reflect it in db
                 user.access_token = None
                 user.save()
             else:
                 return HttpResponse(
-                    "WePay error on update. %s" % e, status=500)
+                    "WePay error on update. %s" % exc, status=exc.status_code)
         ipn_processed.send(sender=model, instance=obj)
         return HttpResponse("Successfull %s update." % obj_name)
         
@@ -127,7 +127,7 @@ class OAuth2Mixin(object):
             user, response = self.app.api_oauth2_token(
                 code=code, redirect_uri=self.get_redirect_uri(), **kwargs)
             return user
-        except WePayError as exc:
+        except WePayHTTPError as exc:
             if exc.error_code == 1012: # the code has expired
                 raise AttributeError(str(e))
             raise
