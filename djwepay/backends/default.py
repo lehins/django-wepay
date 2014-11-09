@@ -390,6 +390,8 @@ class WePay(PythonWePay):
         settings or Site app enabled and configured.
         :param str uri: last part of url
         """
+        if uri.startswith('http'):
+            return uri
         return '%s%s' % (self.site_uri, uri)
 
 
