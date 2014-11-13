@@ -108,7 +108,7 @@ class AppForm(forms.ModelForm):
         fields = (
             'client_id', 'client_secret', 'access_token', 'account', 'user',
             'name', 'primary_color', 'secondary_color',
-            'background_color', 'button_color', 'gaq_domains'
+            'background_color', 'button_color', #'gaq_domains'
         )
 
 
