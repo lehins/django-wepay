@@ -6,3 +6,5 @@ def get_version():
     return "%s.%s.%s" % VERSION
 
 __version__ = get_version()
+
+default_app_config = 'djwepay.apps.WePayConfig'
