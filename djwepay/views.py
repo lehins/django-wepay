@@ -14,26 +14,32 @@ __all__ = ['IPNView', 'OAuth2Mixin']
 class IPNView(View):
 
     http_method_names = ['post']
+    supported_objects = [
+        'user', 'account', 'checkout', 'preapproval', 'withdrawal', 
+        'subscription_plan', 'subscription'
+    ]
 
     @method_decorator(csrf_exempt)
     def dispatch(self, *args, **kwargs):
         return super(IPNView, self).dispatch(*args, **kwargs)
 
 
-    def post(self, request, obj_name=None, user_id=None, **kwargs):
-        if obj_name == 'preapproval' and 'checkout_id' in request.POST:
-            # as described in https://www.wepay.com/developer/reference/ipn
-            # checkouts created automatically will receive IPNs to preapproval's
-            # callback_uri
-            obj_name = 'checkout'
-        model = get_wepay_model(obj_name)
-        obj_id_name = "%s_id" % obj_name
-        user = None
-        try:
-            obj_id = request.POST[obj_id_name]
-        except KeyError:
+    def post(self, request, user_id=None, **kwargs):
+        model = None
+        obj_id = None
+        for obj_name in self.supported_objects:
+            obj_id_name = "%s_id" % obj_name
+            if obj_id_name in request.POST:
+                obj_id = request.POST[obj_id_name]
+                model = get_wepay_model(obj_name)
+                break
+        if model is None:
+            if obj_id is None:
+                return HttpResponse(
+                    "Missing object_id in POST.", status=400)
             return HttpResponse(
-                "Missing object_id in POST: %s" % obj_id_name, status=501)
+                "Object '%s' is not supported by this application." % obj_name, status=501)
+        user = None
         try:
             obj = model.objects.get(pk=obj_id)
         except model.DoesNotExist:
@@ -43,7 +49,7 @@ class IPNView(View):
                 raise Http404("User object with user_id: '%s' not found." % obj_id)
             obj = model(pk=obj_id)
         if user_id is not None:
-            # retrive access_token from the user object, so we can perform a lookup call
+            # retrieve access_token from the user object, so we can perform a lookup call
             user = get_object_or_404(get_wepay_model('user'), pk=user_id)
             obj.access_token = user.access_token
         try:

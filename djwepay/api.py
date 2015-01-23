@@ -65,7 +65,6 @@ def is_abstract(obj_name):
             get_wepay_model_name(obj_name) != DEFAULT_MODELS.get(obj_name))
 
 
-
 class WePayLazy(LazyObject):
 
     def _setup(self):
@@ -73,7 +72,6 @@ class WePayLazy(LazyObject):
         app = get_wepay_model('app').objects.get_current()
         self._wrapped = backend(production=getattr(settings, 'WEPAY_PRODUCTION', False), 
                                 access_token=app.access_token)
-
 
 
 class Api(object):
@@ -107,14 +105,11 @@ class Api(object):
                                previous_state=previous_state)
         return self
 
-
     def instance_identity(self, response):
         return self
 
-
-    def get_callback_uri(self, **kwargs):
+    def _get_callback_uri(self, **kwargs):
         return reverse('wepay:ipn', kwargs=kwargs)
-
 
 
 class AppApi(Api):
@@ -126,7 +121,6 @@ class AppApi(Api):
             return self.user.access_token
         return None
 
-
     def api_app(self, commit=True, **kwargs):
         app, response = self.api.app(
             client_id=self.client_id,
@@ -136,7 +130,6 @@ class AppApi(Api):
             App = get_wepay_model('app')
             App.objects.clear_cache()
         return app, response
-
 
     def api_app_modify(self, commit=True, **kwargs):
         app, response = self.api.app.modify(
@@ -148,22 +141,19 @@ class AppApi(Api):
             App.objects.clear_cache()
         return app, response
 
-
     def api_oauth2_authorize(self, redirect_uri, **kwargs):
         return self.api.oauth2.authorize(
             self.client_id, redirect_uri, kwargs.pop('scope', DEFAULT_SCOPE),
             **kwargs)
-
 
     def api_oauth2_token(self, commit=True, **kwargs):
         User = get_wepay_model('user')
         return self.api.oauth2.token(
             client_id=self.client_id,
             client_secret=self.client_secret,
-            callback_uri=self.get_callback_uri(obj_name='user'),
-            callback=curry(User.objects.create_from_response, self, commit=commit),
+            callback_uri=self._get_callback_uri(),
+            callback=curry(User.objects.create_from_response, commit, app=self),
             **kwargs)
-
 
     def api_user_register(self, commit=True, **kwargs):
         User = get_wepay_model('user')
@@ -171,47 +161,40 @@ class AppApi(Api):
             client_id=self.client_id,
             client_secret=self.client_secret,
             scope=kwargs.pop('scope', DEFAULT_SCOPE),
-            callback_uri=self.get_callback_uri(obj_name='user'),
-            callback=curry(User.objects.create_from_response, self, commit=commit),
+            callback_uri=self._get_callback_uri(),
+            callback=curry(User.objects.create_from_response, commit, app=self),
             **kwargs)
-
 
     def api_preapproval_create(self, commit=True, **kwargs):
         Preapproval = get_wepay_model('preapproval')
         return self.api.preapproval.create(
             client_id=self.client_id,
             client_secret=self.client_secret,
-            callback_uri = self.get_callback_uri(obj_name='preapproval'),
-            callback=curry(Preapproval.objects.create_from_response, self, commit=commit),
+            callback_uri = self._get_callback_uri(),
+            callback=curry(Preapproval.objects.create_from_response, commit, app=self),
             **kwargs)
-
 
     def api_preapproval_find(self, **kwargs):
         return self.api.preapproval.find(**kwargs)
-
 
     def api_credit_card_create(self, commit=True, **kwargs):
         CreditCard = get_wepay_model('credit_card')
         return self.api.credit_card.create(
             client_id=self.client_id,
-            callback=curry(CreditCard.objects.create_from_response, commit=commit),
+            callback=curry(CreditCard.objects.create_from_response, commit, app=self),
             **kwargs)
-
 
     def api_credit_card_find(self, **kwargs):
         return self.api.credit_card.find(
             client_id=self.client_id,
             client_secret=self.client_secret, **kwargs)
 
-
     def api_subscription_plan_find(self, **kwargs):
         return self.api.subscription_plan.find(**kwargs)
-
 
     def api_batch_create(self, batch_id, **kwargs):
         return self.api.batch.create(
             batch_id, self.client_id, self.client_secret, **kwargs)
-
 
 
 class UserApi(Api):
@@ -220,38 +203,34 @@ class UserApi(Api):
     def callback_uri(self):
         return self.api_user()[1].get('callback_uri', None)
 
-
     def api_user(self, commit=True, **kwargs):
         return self.api.user(
             access_token=self.access_token,
             callback=curry(self.instance_update, commit=commit), **kwargs)
-
 
     def api_user_modify(self, commit=True, **kwargs):
         return self.api.user.modify(
             access_token=self.access_token,
             callback=curry(self.instance_update, commit=commit), **kwargs)
 
-
     def api_user_resend_confirmation(self, commit=True, **kwargs):
         return self.api.user.resend_confirmation(
             callback=curry(self.instance_update, commit=commit), **kwargs)
-
 
     def api_account_create(self, commit=True, **kwargs):
         Account = get_wepay_model('account')
         return self.api.account.create(
             access_token=self.access_token,
-            callback_uri=self.get_callback_uri(
-                obj_name='account', user_id=self.pk),
-            callback=curry(Account.objects.create_from_response, self, commit=commit),
+            callback_uri=self._get_callback_uri(user_id=self.pk),
+            callback=curry(Account.objects.create_from_response, commit, user=self),
             **kwargs)
-
 
     def api_account_find(self, **kwargs):
         return self.api.account.find(
             access_token=self.access_token, **kwargs)
 
+    def get_callback_uri(self):
+        return self._get_callback_uri()
 
 
 class AccountApi(Api):
@@ -266,11 +245,9 @@ class AccountApi(Api):
     def uri(self):
         return self.api_account_get_update_uri()[1].get('uri', None)
 
-
     @cached_property
     def callback_uri(self):
         return self.api_account()[1].get('callback_uri', None)
-
 
     def api_account(self, commit=True, **kwargs):
         try:
@@ -284,13 +261,11 @@ class AccountApi(Api):
                 self.save()
             raise
 
-
     def api_account_modify(self, commit=True, **kwargs):
         return self.api.account.modify(
             account_id=self.pk,
             access_token=self.access_token,
             callback=curry(self.instance_update, commit=commit), **kwargs)
-
 
     def api_account_delete(self, commit=True, **kwargs):
         return self.api.account.delete(
@@ -298,13 +273,11 @@ class AccountApi(Api):
             access_token=self.access_token,
             callback=curry(self.instance_update, commit=commit), **kwargs)
 
-
     def api_account_get_update_uri(self, commit=False, **kwargs):
         return self.api.account.get_update_uri(
             account_id=self.pk,
             access_token=self.access_token,
             callback=curry(self.instance_update, commit=commit), **kwargs)
-
 
     def api_account_get_reserve_details(self, commit=True, **kwargs):
         return self.api.account.get_reserve_details(
@@ -312,74 +285,61 @@ class AccountApi(Api):
             access_token=self.access_token,
             callback=curry(self.instance_update, commit=commit), **kwargs)
 
-
     def api_checkout_create(self, commit=True, **kwargs):
         Checkout = get_wepay_model('checkout')
         return self.api.checkout.create(
             account_id=self.pk,
             access_token=self.access_token,
-            callback_uri=self.get_callback_uri(
-                obj_name='checkout', user_id=self.user.pk),
-            callback=curry(Checkout.objects.create_from_response, self, commit=commit),
+            callback_uri=self._get_callback_uri(user_id=self.user.pk),
+            callback=curry(Checkout.objects.create_from_response, commit, account=self),
             **kwargs)
-
 
     def api_preapproval_create(self, commit=True, **kwargs):
         Preapproval = get_wepay_model('preapproval')
         return self.api.preapproval.create(
             account_id=self.pk,
             access_token=self.access_token,
-            callback_uri=self.get_callback_uri(
-                obj_name='preapproval', user_id=self.user.pk),
-            callback=curry(Preapproval.objects.create_from_response, self, commit=commit),
+            callback_uri=self._get_callback_uri(user_id=self.user.pk),
+            callback=curry(Preapproval.objects.create_from_response, commit, account=self),
             **kwargs)
-
 
     def api_withdrawal_create(self, commit=True, **kwargs):
         Withdrawal = get_wepay_model('withdrawal')
         return self.api.withdrawal.create(
             account_id=self.pk,
             access_token=self.access_token,
-            callback_uri=self.get_callback_uri(
-                obj_name='withdrawal', user_id=self.user.pk),
-            callback=curry(Withdrawal.objects.create_from_response, self, commit=commit),
+            callback_uri=self._get_callback_uri(user_id=self.user.pk),
+            callback=curry(Withdrawal.objects.create_from_response, commit, account=self),
             **kwargs)
-
 
     def api_subscription_plan_create(self, commit=True, **kwargs):
         SubscriptionPlan = get_wepay_model('subscription_plan')
         return self.api.subscription_plan.create(
             account_id=self.pk,
             access_token=self.access_token,
-            callback_uri=self.get_callback_uri(
-                obj_name='subscription_plan', user_id=self.user.pk),
-            callback=curry(SubscriptionPlan.objects.create_from_response, self, commit=commit),
+            callback_uri=self._get_callback_uri(user_id=self.user.pk),
+            callback=curry(SubscriptionPlan.objects.create_from_response, commit, account=self),
             **kwargs)
-
 
     def api_checkout_find(self, **kwargs):
         return self.api.checkout.find(
             account_id=self.pk,
             access_token=self.access_token, **kwargs)
 
-
     def api_preapproval_find(self, **kwargs):
         return self.api.preapproval.find(
             account_id=self.account_id,
             access_token=self.access_token, **kwargs)
-
 
     def api_withdrawal_find(self, **kwargs):
         return self.api.withdrawal.find(
             account_id=self.pk,
             access_token=self.access_token, **kwargs)
 
-
     def api_subscription_plan_find(self, **kwargs):
         return self.api.subscription_plan.find(
             account_id=self.pk,
             access_token=self.access_token, **kwargs)
-
 
     def api_subscription_plan_get_button(self, **kwargs):
         return self.api.subscription_plan.get_button(
@@ -387,6 +347,8 @@ class AccountApi(Api):
             access_token=self.access_token,
             callback=self.instance_identity, **kwargs)
 
+    def get_callback_uri(self):
+        return self._get_callback_uri(user_id=self.user.pk)
 
 
 class CheckoutApi(Api):
@@ -407,13 +369,11 @@ class CheckoutApi(Api):
     def dispute_uri(self):
         return self.api_checkout()[1].get('dispute_uri', None)
 
-
     def api_checkout(self, commit=True, **kwargs):
         return self.api.checkout(
             checkout_id=self.pk,
             access_token=self.access_token,
             callback=curry(self.instance_update, commit=commit), **kwargs)
-
 
     def api_checkout_cancel(self, commit=True, **kwargs):
         return self.api.checkout.cancel(
@@ -421,13 +381,11 @@ class CheckoutApi(Api):
             access_token=self.access_token,
             callback=curry(self.instance_update, commit=commit), **kwargs)
 
-
     def api_checkout_refund(self, commit=True, **kwargs):
         return self.api.checkout.refund(
             checkout_id=self.pk,
             access_token=self.access_token,
             callback=curry(self.instance_update, commit=commit), **kwargs)
-
 
     def api_checkout_capture(self, commit=True, **kwargs):
         return self.api.checkout.capture(
@@ -435,13 +393,14 @@ class CheckoutApi(Api):
             access_token=self.access_token,
             callback=curry(self.instance_update, commit=commit), **kwargs)
 
-
     def api_checkout_modify(self, commit=True, **kwargs):
         return self.api.checkout.modify(
             checkout_id=self.pk,
             access_token=self.access_token,
             callback=curry(self.instance_update, commit=commit), **kwargs)
 
+    def get_callback_uri(self):
+        return self._get_callback_uri(user_id=self.account.user.pk)
 
 
 class PreapprovalApi(Api):
@@ -469,13 +428,14 @@ class PreapprovalApi(Api):
     def callback_uri(self):
         return self.api_preapproval()[1].get('callback_uri', None)
 
-
     def api_preapproval(self, commit=True, **kwargs):
+        Preapproval = get_wepay_model('preapproval')
         return self.api.preapproval(
             preapproval_id=self.pk,
             access_token=self.access_token,
-            callback=curry(self.instance_update, commit=commit), **kwargs)
-
+            callback=curry(Preapproval.objects.create_from_response, 
+                           commit, account=self.account),
+            **kwargs)
 
     def api_preapproval_cancel(self, commit=True, **kwargs):
         return self.api.preapproval.cancel(
@@ -483,13 +443,14 @@ class PreapprovalApi(Api):
             access_token=self.access_token,
             callback=curry(self.instance_update, commit=commit), **kwargs)
 
-
     def api_preapproval_modify(self, commit=True, **kwargs):
+        Preapproval = get_wepay_model('preapproval')
         return self.api.preapproval.modify(
             preapproval_id=self.pk,
             access_token=self.access_token,
-            callback=curry(self.instance_update, commit=commit), **kwargs)
-
+            callback=curry(Preapproval.objects.create_from_response, 
+                           commit, account=self.account),
+            **kwargs)
 
     def api_checkout_create(self, account=None, commit=True, **kwargs):
         """Create a checkout using this preapproval. In case that preapproval
@@ -505,11 +466,14 @@ class PreapprovalApi(Api):
             account_id=account.pk,
             access_token=account.access_token,
             preapproval_id=self.pk,
-            callback_uri=self.get_callback_uri(
-                obj_name='checkout', user_id=account.user.pk),
-            callback=curry(Checkout.objects.create_from_response, account, commit=commit),
+            callback_uri=self._get_callback_uri(user_id=account.user.pk),
+            callback=curry(Checkout.objects.create_from_response, commit, account=account),
             **kwargs)
 
+    def get_callback_uri(self):
+        if self.account:
+            return self._get_callback_uri(user_id=self.account.user.pk)
+        return self._get_callback_uri(user_id=self.app.user.pk)
 
 
 class WithdrawalApi(Api):
@@ -530,13 +494,11 @@ class WithdrawalApi(Api):
     def callback_uri(self):
         return self.api_withdrawal()[1].get('callback_uri', None)
 
-
     def api_withdrawal(self, commit=True, **kwargs):
         return self.api.withdrawal(
             withdrawal_id=self.pk,
             access_token=self.access_token,
             callback=curry(self.instance_update, commit=commit), **kwargs)
-
 
     def api_withdrawal_modify(self, commit=True, **kwargs):
         return self.api.withdrawal.modify(
@@ -544,6 +506,8 @@ class WithdrawalApi(Api):
             access_token=self.access_token,
             callback=curry(self.instance_update, commit=commit), **kwargs)
 
+    def get_callback_uri(self):
+        return self._get_callback_uri(user_id=self.account.user.pk)
 
 
 class CreditCardApi(Api):
@@ -555,7 +519,6 @@ class CreditCardApi(Api):
             credit_card_id=self.pk,
             callback=curry(self.instance_update, commit=commit), **kwargs)
 
-
     def api_credit_card_authorize(self, commit=True, **kwargs):
         return self.api.credit_card.authorize(
             client_id=self.app.client_id,
@@ -563,14 +526,12 @@ class CreditCardApi(Api):
             credit_card_id=self.pk,
             callback=curry(self.instance_update, commit=commit), **kwargs)
 
-
     def api_credit_card_delete(self, commit=True, **kwargs):
         return self.api.credit_card.delete(
             client_id=self.app.client_id,
             client_secret=self.app.client_secret,
             credit_card_id=self.pk,
             callback=curry(self.instance_update, commit=commit), **kwargs)
-
 
 
 class SubscriptionPlanApi(Api):
@@ -583,20 +544,17 @@ class SubscriptionPlanApi(Api):
     def callback_uri(self):
         return self.api_subscription_plan()[1].get('callback_uri', None)
 
-
     def api_subscription_plan(self, commit=True, **kwargs):
         return self.api.subscription_plan(
             subscription_plan_id=self.pk,
             access_token=self.access_token,
             callback=curry(self.instance_update, commit=commit), **kwargs)
 
-
     def api_subscription_plan_delete(self, commit=True, **kwargs):
         return self.api.subscription_plan.delete(
             subscription_plan_id=self.pk,
             access_token=self.access_token,
             callback=curry(self.instance_update, commit=commit), **kwargs)
-
 
     def api_subscription_plan_get_button(self, **kwargs):
         return self.api.subscription_plan.get_button(
@@ -606,29 +564,28 @@ class SubscriptionPlanApi(Api):
             access_token=self.access_token,
             callback=self.instance_identity, **kwargs)
 
-
     def api_subscription_plan_modify(self, commit=True, **kwargs):
         return self.api.subscription_plan.modify(
             subscription_plan_id=self.pk,
             access_token=self.access_token,
             callback=curry(self.instance_update, commit=commit), **kwargs)
 
-
     def api_subscription_create(self, commit=True, **kwargs):
         Subscription = get_wepay_model('subscription')
         return self.api.subscription.create(
             subscription_plan_id=self.pk,
-            callback_uri=self.get_callback_uri(
-                obj_name='subscription', user_id=self.account.user.pk),
-            callback=curry(Subscription.objects.create_from_response, self, commit=commit),
+            callback_uri=self._get_callback_uri(user_id=self.account.user.pk),
+            callback=curry(Subscription.objects.create_from_response, 
+                           commit, subscription_plan=self),
             access_token=self.access_token, **kwargs)
-
 
     def api_subscription_find(self, **kwargs):
         return self.api.subscription.find(
             subscription_plan_id=self.pk,
             access_token=self.access_token, **kwargs)
 
+    def get_callback_uri(self):
+        return self._get_callback_uri(user_id=self.account.user.pk)
 
 
 class SubscriptionApi(Api):
@@ -649,13 +606,11 @@ class SubscriptionApi(Api):
     def redirect_uri(self):
         return self.api_subscription()[1].get('redirect_uri', None)
 
-
     def api_subscription(self, commit=True, **kwargs):
         return self.api.subscription(
             subscription_id=self.pk,
             access_token=self.access_token,
             callback=curry(self.instance_update, commit=commit), **kwargs)
-
 
     def api_subscription_cancel(self, commit=True, **kwargs):
         return self.api.subscription.cancel(
@@ -663,19 +618,19 @@ class SubscriptionApi(Api):
             access_token=self.access_token,
             callback=curry(self.instance_update, commit=commit), **kwargs)
 
-
     def api_subscription_modify(self, commit=True, **kwargs):
         return self.api.subscription.modify(
             subscription_id=self.pk,
             access_token=self.access_token,
             callback=curry(self.instance_update, commit=commit), **kwargs)
 
-
     def api_subscription_charge_find(self, **kwargs):
         return self.api.subscription_charge.find(
             subscription_id=self.pk,
             access_token=self.access_token, **kwargs)
 
+    def get_callback_uri(self):
+        return self._get_callback_uri(user_id=self.subscription_plan.account.user.pk)
 
 
 class SubscriptionChargeApi(Api):
@@ -684,16 +639,17 @@ class SubscriptionChargeApi(Api):
     def access_token(self):
         return self.subscription_plan.access_token
 
-
     def api_subscription_charge(self, commit=True, **kwargs):
         return self.api.subscription_charge(
             subscription_charge_id=self.pk,
             access_token=self.access_token,
             callback=curry(self.instance_update, commit=commit), **kwargs)
 
-
     def api_subscription_charge_refund(self, commit=True, **kwargs):
         return self.api.subscription_charge.refund(
             subscription_charge_id=self.pk,
             access_token=self.access_token,
             callback=curry(self.instance_update, commit=commit), **kwargs)
+
+    def get_callback_uri(self):
+        return self._get_callback_uri(user_id=self.subscription_plan.account.user.pk)

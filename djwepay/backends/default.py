@@ -2,10 +2,11 @@ import time, logging
 from django.conf import settings
 from django.contrib.sites.models import Site
 from django.core.cache import cache
+from django.core.mail import mail_admins
 
 from djwepay.utils import make_batch_key, make_callback_key
 from wepay import calls, WePay as PythonWePay
-from wepay.exceptions import WePayError
+from wepay.exceptions import WePayHTTPError, WePayConnectionError
 from wepay.utils import cached_property
 
 
@@ -19,6 +20,7 @@ THROTTLE_TIMEOUT = getattr(settings, 'WEPAY_THROTTLE_TIMEOUT', 10)
 THROTTLE_CALL_KEY = getattr(settings, 'WEPAY_THROTTLE_CALL_KEY', 'wepay-throttle-call')
 BLOCKING_KEY = THROTTLE_CALL_KEY + '-blocked'
 DOMAIN = getattr(settings, 'WEPAY_SITE_DOMAIN', None)
+WEPAY_MAIL_ADMIN = getattr(settings, 'WEPAY_MAIL_ADMINS', not DEBUG)
 
 
 BATCH_CALLS_NUMBER = getattr(settings, 'WEPAY_BATCH_CALLS_NUMBER', 50)
@@ -376,8 +378,15 @@ class WePay(PythonWePay):
                 response = self._call_protected(uri, **kwargs)
             else:
                 response = super(WePay, self).call(uri, **kwargs)
-        except WePayError as e:
+        except (WePayHTTPError, WePayConnectionError) as e:
             self._log_error(e, uri, kwargs.get('params', {}))
+            mail_admins(
+                "WePayError", """
+                There was a problem with making an API call: %s
+                Params: %s
+                Timeout: %s
+                Error received: %s""" % (
+                    uri, kwargs.get('params', None), kwargs.get('timeout', None), e))
             raise
         if DEBUG:
             self._log_debug(uri, kwargs.get('params', {}), response)

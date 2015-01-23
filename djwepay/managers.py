@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.db import models
+from django.db.models.options import FieldDoesNotExist
 
 from djwepay.api import get_wepay_model
 
@@ -41,26 +42,23 @@ class AppManager(models.Manager):
         APP_CACHE = {}
 
 
+class ObjectManager(models.Manager):
 
-class UserManager(models.Manager):
-
-    def create_from_response(self, app, response, **kwargs):
+    def create_from_response(self, commit, response, **kwargs):
+        pk = response[self.model._meta.pk.attname]
         try:
-            user = self.get(pk=response['user_id'])
+            obj = self.get(pk=pk)
         except self.model.DoesNotExist:
-            user = self.model(app=app)
-        return user.instance_update(response, **kwargs)
+            obj = self.model(pk=pk, **kwargs)
+        return obj.instance_update(response, commit=commit)
+
+class UserManager(ObjectManager):
 
     def accessible(self):
         return self.exclude(access_token=None)
 
 
-
-class AccountManager(models.Manager):
-
-    def create_from_response(self, user, response, **kwargs):
-        account = self.model(user=user)
-        return account.instance_update(response, **kwargs)
+class AccountManager(ObjectManager):
 
     def accessible(self):
         return self.exclude(user__access_token=None)
@@ -69,34 +67,51 @@ class AccountManager(models.Manager):
         return self.accessible().filter(state='active')
 
 
-
-class AccountObjectsManager(models.Manager):
-
-    def create_from_response(self, account, response, **kwargs):
-        obj = self.model(account=account)
-        return obj.instance_update(response, **kwargs)
+class AccountObjectsManager(ObjectManager):
 
     def accessible(self):
         return self.exclude(account__user__access_token=None)
 
 
-
 class PreapprovalManager(AccountObjectsManager):
 
-    def create_from_response(self, app_or_account, response, **kwargs):
-        if isinstance(app_or_account, get_wepay_model('app')):
-            preapproval = self.model(app=app_or_account)
-            return preapproval.instance_update(response, **kwargs)
-        return super(PreapprovalManager, self).create_from_response(
-            app_or_account, response, **kwargs)
+    def create_from_response(self, commit, response, **kwargs):
+        preapproval = super(PreapprovalManager, self).create_from_response(
+            False, response, **kwargs)
+        if response.get('last_checkout_id', None):
+            # Here is some necessary evil. It can happen that we are retrieving 
+            # an existing preapproval, that was used already to create a checkout.
+            # So in order to prevent IntegrityError we get that Checkout from WePay
+            # and save it db, but only after we commit Preapproval without last_checkout
+            # This will not work if it is an App level Preapproval, since access_token
+            # will be different between the two.
+            try:
+                checkout_field = self.model._meta.get_field('last_checkout')
+                Checkout = checkout_field.rel.to
+                if not Checkout.objects.filter(pk=response['last_checkout_id']).exists():
+                    if preapproval.account:
+                        checkout = Checkout(checkout_id=response['last_checkout_id'],
+                                            account=preapproval.account)
+                        preapproval.last_checkout = None
+                        preapproval.save()
+                        checkout.api_checkout()
+                        preapproval.last_checkout = checkout
+            except FieldDoesNotExist: 
+                # if it is a custom Preapproval model without last_checkout field, 
+                # we don't need to worry about it and can proceed as normal
+                pass
+        if commit:
+            preapproval.save()
+        return preapproval
 
 
+class SubscriptionManager(ObjectManager):
 
-class SubscriptionManager(models.Manager):
+    def accessible(self):
+        return self.exclude(subscription_plan__account__user__access_token=None)
 
-    def create_from_response(self, subscription_plan, response, **kwargs):
-        obj = self.model(subscription_plan=subscription_plan)
-        return obj.instance_update(response, **kwargs)
+
+class SubscriptionChargeManager(ObjectManager):
 
     def accessible(self):
         return self.exclude(subscription_plan__account__user__access_token=None)

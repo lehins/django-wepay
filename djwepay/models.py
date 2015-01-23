@@ -11,6 +11,7 @@ from Api objects defined in :mod:`djwepay.api`.
 """
 from django.db import models
 from django.utils import timezone
+from django.utils.encoding import python_2_unicode_compatible
 
 from djwepay.api import *
 from djwepay.fields import MoneyField
@@ -25,7 +26,7 @@ __all__ = [
 ]
 
 
-
+@python_2_unicode_compatible
 class BaseModel(models.Model):
 
     date_created  = models.DateTimeField(auto_now_add=True)
@@ -43,6 +44,8 @@ class BaseModel(models.Model):
             self.date_created = self.date_modified
         return super(BaseModel, self).save(*args, **kwargs)
 
+    def __str__(self):
+        return "%s: %s - %s" % (self._meta.verbose_name, self.pk, self.state)
 
 
 class App(AppApi, BaseModel):
@@ -78,7 +81,6 @@ class App(AppApi, BaseModel):
         verbose_name = 'WePay App'
 
 
-
 class User(UserApi, BaseModel):
     user_id = models.BigIntegerField(primary_key=True)
     app = models.ForeignKey(
@@ -100,10 +102,6 @@ class User(UserApi, BaseModel):
         abstract = is_abstract('user')
         db_table = 'djwepay_user'
         verbose_name = 'WePay User'
-
-    def __str__(self):
-        return self.user_name
-
 
 
 class Account(AccountApi, BaseModel):
@@ -143,10 +141,6 @@ class Account(AccountApi, BaseModel):
         db_table = 'djwepay_account'
         verbose_name = 'WePay Account'
 
-    def __str__(self):
-        return "%s - %s" % (self.pk, self.name)
-
-
 
 class Checkout(CheckoutApi, BaseModel):
     checkout_id = models.BigIntegerField(primary_key=True)
@@ -184,10 +178,6 @@ class Checkout(CheckoutApi, BaseModel):
         abstract = is_abstract('checkout')
         db_table = 'djwepay_checkout'
         verbose_name = 'WePay Checkout'
-
-    def __str__(self):
-        return "%s - %s" % (self.pk, self.short_description)
-
 
 
 class Preapproval(PreapprovalApi, BaseModel):
@@ -228,10 +218,6 @@ class Preapproval(PreapprovalApi, BaseModel):
         db_table = 'djwepay_preapproval'
         verbose_name = 'WePay Preapproval'
 
-    def __str__(self):
-        return "%s - %s" % (self.pk, self.short_description)
-
-
 
 class Withdrawal(WithdrawalApi, BaseModel):
     withdrawal_id = models.BigIntegerField(primary_key=True)
@@ -252,10 +238,6 @@ class Withdrawal(WithdrawalApi, BaseModel):
         db_table = 'djwepay_withdrawal'
         verbose_name = 'WePay Preapproval'
 
-    def __str__(self):
-        return "%s - %s" % (self.pk, self.amount)
-
-
 
 class CreditCard(CreditCardApi, BaseModel):
     credit_card_id = models.BigIntegerField(primary_key=True)
@@ -272,10 +254,6 @@ class CreditCard(CreditCardApi, BaseModel):
         abstract = is_abstract('credit_card')
         db_table = 'djwepay_credit_card'
         verbose_name = 'WePay Credit Card'
-
-    def __str__(self):
-        return self.credit_card_name
-
 
 
 class SubscriptionPlan(SubscriptionPlanApi, BaseModel):
@@ -302,7 +280,6 @@ class SubscriptionPlan(SubscriptionPlanApi, BaseModel):
         abstract = is_abstract('subscription_plan')
         db_table = 'djwepay_subscription_plan'
         verbose_name = 'WePay Subscription Plan'
-
 
 
 class Subscription(SubscriptionApi, BaseModel):
@@ -363,3 +340,4 @@ class SubscriptionCharge(SubscriptionChargeApi, BaseModel):
         abstract = is_abstract('subscription_charge')
         db_table = 'djwepay_subscription_charge'
         verbose_name = 'WePay Subscription Charge'
+
