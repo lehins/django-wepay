@@ -36,6 +36,7 @@ class Command(BaseCommand):
                     api_modify = getattr(obj, "api_%s_modify" % obj_name)
                     print("Modified: %s" % api_modify(callback_uri=obj.get_callback_uri())[0])
                 except (WePayHTTPError, WePayConnectionError) as e:
+                    print("Error: %s" % e)
                     update_errors.append({
                         'call': "api_%s_modify" % obj_name, 
                         'object': obj,

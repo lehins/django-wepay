@@ -18,12 +18,12 @@ class Command(BaseCommand):
     ]
     retrieve_errors = None
 
-    def retrieve_objects(self, obj_name, parent, parent_name):
+    def retrieve_objects(self, obj_name, parent, parent_name, **kwargs):
         start = 0
         limit = 5
         api_find = getattr(parent, "api_%s_find" % obj_name)
         responses = api_find(
-            start=start, limit=limit, timeout=3*60)[1]
+            start=start, limit=limit, timeout=3*60, **kwargs)[1]
         model = get_wepay_model(obj_name)
         objects = []
         while responses:
@@ -43,8 +43,9 @@ class Command(BaseCommand):
             start+= limit
             try:
                 responses = api_find(
-                    start=start, limit=limit, timeout=3*60)[1]
+                    start=start, limit=limit, timeout=3*60, **kwargs)[1]
             except (WePayHTTPError, WePayConnectionError) as e:
+                print("Error: %s" % e)
                 self.retrieve_errors.append({
                     'call': "api_%s_find" % obj_name, 
                     'params': "start=%s, limit=%s" % (start, limit),
@@ -92,11 +93,9 @@ class Command(BaseCommand):
                         accounts.append(account)
             else:
                 accounts = user.accounts.exclude(state='deleted')
-            if 'preapproval' in objects:
+            if 'preapproval' in objects and False:
                 for account in accounts:
                     self.retrieve_objects('preapproval', account, 'account')
-                app = get_wepay_model('app').objects.get_current()
-                self.retrieve_objects('preapproval', app, 'app')
             if 'checkout' in objects:
                 for account in accounts:
                     self.retrieve_objects('checkout', account, 'account')
@@ -105,7 +104,21 @@ class Command(BaseCommand):
                     self.retrieve_objects('withdrawal', account, 'account')
             if 'subscription_plan' in objects:
                 for account in accounts:
-                    self.retrieve_objects('withdrawal', account, 'account')
+                    subscription_plans = self.retrieve_objects(
+                        'subscription_plan', account, 'account')
+                    if 'subscription' in objects:
+                        for subscription_plan in subscription_plans:
+                            self.retrieve_objects(
+                                'subscription', subscription_plan, 'subscription_plan')
+                    if 'subscription_charge' in objects:
+                        for subscription_plan in subscription_plans:
+                            self.retrieve_objects(
+                                'subscription_charge', subscription_plan, 'subscription_plan')
+        app = get_wepay_model('app').objects.get_current()
+        #if 'preapproval' in objects:
+        #    self.retrieve_objects('preapproval', app, 'app', account_id=0)
+        if 'credit_card' in objects:
+            self.retrieve_objects('credit_card', app, 'app')
         if self.retrieve_errors:
             print("THERE WERE ERRORS:")
             print(self.retrieve_errors)
