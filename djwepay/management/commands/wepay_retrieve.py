@@ -93,7 +93,7 @@ class Command(BaseCommand):
                         accounts.append(account)
             else:
                 accounts = user.accounts.exclude(state='deleted')
-            if 'preapproval' in objects and False:
+            if 'preapproval' in objects:
                 for account in accounts:
                     self.retrieve_objects('preapproval', account, 'account')
             if 'checkout' in objects:

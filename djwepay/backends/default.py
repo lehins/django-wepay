@@ -6,7 +6,7 @@ from django.core.mail import mail_admins
 
 from djwepay.utils import make_batch_key, make_callback_key
 from wepay import calls, WePay as PythonWePay
-from wepay.exceptions import WePayHTTPError, WePayConnectionError
+from wepay.exceptions import WePayError, WePayHTTPError, WePayConnectionError
 from wepay.utils import cached_property
 
 
@@ -386,7 +386,9 @@ class WePay(PythonWePay):
                 Params: %s
                 Timeout: %s
                 Error received: %s""" % (
-                    uri, kwargs.get('params', None), kwargs.get('timeout', None), e))
+                    uri, kwargs.get('params', None), kwargs.get('timeout', None), e),
+                fail_silently=not DEBUG
+            )
             raise
         if DEBUG:
             self._log_debug(uri, kwargs.get('params', {}), response)
