@@ -103,6 +103,10 @@ class User(UserApi, BaseModel):
         db_table = 'djwepay_user'
         verbose_name = 'WePay User'
 
+    @property
+    def full_email(self):
+        return "%s <%s>" % (self.user_name, self.email)
+
 
 class Account(AccountApi, BaseModel):
     account_id = models.BigIntegerField(primary_key=True)
