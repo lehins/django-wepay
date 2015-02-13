@@ -29,8 +29,6 @@ from wepay.exceptions import WePayError, WePayConnectionError
 #        return super(JSONArrayField, self).to_python(value)
 
 
-
-
 class AppForm(forms.ModelForm):
     client_id = forms.IntegerField(
         required=True, min_value=0, help_text="This is the ID of your API application.")
@@ -75,7 +73,6 @@ class AppForm(forms.ModelForm):
         })
         super(AppForm, self).__init__(*args, **kwargs)
 
-
     def clean(self):
         # update/create associated account
 
@@ -112,7 +109,6 @@ class AppForm(forms.ModelForm):
         )
 
 
-
 ACCOUNT_TYPE_CHOICES = (
     ('personal', "Personal"),
     ('nonprofit', "Non-profit Organization"),
@@ -132,7 +128,6 @@ class AccountCreateForm(forms.Form):
         if name.lower().rfind("wepay") >= 0:
             raise forms.ValidationError("Account name cannot contain 'wepay'.")
         return name
-
 
 
 class AccountEditForm(forms.ModelForm):
@@ -162,9 +157,12 @@ class AccountEditForm(forms.ModelForm):
 
 
     def save(self, commit=True):
-        return self.account.api_account_modify(commit=commit, **self.cleaned_data)
-
-
+        try:
+            self.account.api_account_modify(commit=commit, **self.cleaned_data)
+        except (WePayError, WePayConnectionError) as e:
+            self.add_error(None, str(e))
+        return self.account
+            
 
 class PreapprovalCancelForm(forms.Form):
 
@@ -225,7 +223,6 @@ class CheckoutCancelForm(forms.Form):
             cancel_reason=self.cleaned_data['cancel_reason'], commit=commit)
 
 
-
 class CheckoutRefundForm(forms.Form):
     
     refund_reason = forms.CharField(
@@ -251,7 +248,6 @@ class CheckoutRefundForm(forms.Form):
             raise forms.ValidationError(
                 "Cannot refund checkout that is in state: %s" % self.checkout.state)
         return self.cleaned_data
-
 
     def save(self, commit=True):
         return self.checkout.api_checkout_refund(

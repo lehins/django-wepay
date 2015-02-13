@@ -61,7 +61,8 @@ class UserManager(ObjectManager):
 class AccountManager(ObjectManager):
 
     def accessible(self):
-        return self.exclude(user__access_token=None)
+        return self.exclude(
+            user__access_token=None).exclude(state__in=['disabled', 'deleted'])
 
     def active(self):
         return self.accessible().filter(state='active')

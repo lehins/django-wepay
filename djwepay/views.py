@@ -1,14 +1,17 @@
+from django.core.exceptions import PermissionDenied
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
-from django.views.generic.base import View
+from django.views.generic.base import View, TemplateView
 
-from djwepay.signals import ipn_processed
 from djwepay.api import get_wepay_model
+from djwepay.signals import ipn_processed
+from djwepay.forms import AccountEditForm
 from wepay.exceptions import WePayHTTPError
+from wepay.utils import cached_property
 
-__all__ = ['IPNView', 'OAuth2Mixin']
+__all__ = ['IPNView', 'OAuth2Mixin', 'AccountMixin', 'AccountEditView']
 
 
 class IPNView(View):
@@ -137,3 +140,74 @@ class OAuth2Mixin(object):
             if exc.error_code == 1012: # the code has expired
                 raise AttributeError(str(e))
             raise
+
+
+class AccountMixin(object):
+    account_id_kwarg_name = 'account_id'
+    refresh = True
+
+    @cached_property
+    def account(self):
+        account_id = self.get_account_id()
+        return self.get_account(account_id)
+
+    def has_permission(self, account):
+        raise NotImplementedError("For security reasons it is a required method.")
+
+    def get_account_id(self):
+        try:
+            return self.kwargs[self.account_id_kwarg_name]
+        except KeyError: pass
+        try:
+            if self.request.method == 'POST':
+                return int(self.request.POST.get(self.account_id_kwarg_name))
+            else:
+                return int(self.request.GET.get(self.account_id_kwarg_name))
+        except (ValueError, TypeError, KeyError): pass
+
+    def get_redirect_uri(self):
+        return self.request.get_full_path()
+
+    def get_account(self, account_id):
+        account = get_object_or_404(get_wepay_model('account'), account_id=account_id)
+        if not self.has_permission(account):
+            raise PermissionDenied
+        if self.refresh:
+            # best attempt to update all of account's info
+            batch_id = 'account-%s-refresh' % account_id
+            redirect_uri = self.get_redirect_uri()
+            account.api_account(batch_mode=True, batch_id=batch_id, commit=False,
+                                batch_reference_id='%s-info' % batch_id)
+            account.api_account_get_update_uri(batch_mode=True, batch_id=batch_id, 
+                                               batch_reference_id='%s-uri' % batch_id,
+                                               redirect_uri=redirect_uri)
+            account.api_account_get_reserve_details(batch_mode=True, batch_id=batch_id, 
+                                                    batch_reference_id='%s-reserve' % batch_id)
+            app = get_wepay_model('app').objects.get_current()
+            try:
+                app.api_batch_create(batch_id, timeout=20)
+            except WePayError: pass
+        return account
+
+
+class AccountView(AccountMixin, TemplateView):
+    submit_name = 'btn_account_edit'
+
+    def get_context_data(self, **kwargs):
+        kwargs['account'] = self.account
+        if 'account_edit_form' not in kwargs:
+            kwargs['account_edit_form'] = AccountEditForm(self.account)
+        return super(AccountView, self).get_context_data(**kwargs)
+
+    def post(self, request, *args, **kwargs):
+        context = {}
+        if self.submit_name in request.POST:
+            account_edit_form = AccountEditForm(self.account, data=request.POST)
+            if account_edit_form.is_valid():
+                account_edit_form.save()
+            context['account_edit_form'] = account_edit_form
+        try:
+            kwargs['context'] = context
+            return super(AccountView, self).post(request, *args, **kwargs)
+        except AttributeError:
+            return self.render_to_response(self.get_context_data(**context))

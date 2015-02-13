@@ -91,7 +91,7 @@ class User(UserApi, BaseModel):
     email = models.EmailField(max_length=255)
     state = models.CharField(max_length=255)
 
-    # access_token=NULL means it has been revoked.
+    # access_token=None means it has been revoked.
     access_token = models.CharField(null=True, max_length=255)
     token_type = "BEARER"
     expires_in = models.BigIntegerField(null=True, blank=True)
