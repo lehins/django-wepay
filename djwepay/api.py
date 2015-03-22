@@ -213,8 +213,8 @@ class UserApi(Api):
             access_token=self.access_token,
             callback=curry(self.instance_update, commit=commit), **kwargs)
 
-    def api_user_resend_confirmation(self, commit=True, **kwargs):
-        return self.api.user.resend_confirmation(
+    def api_user_send_confirmation(self, commit=True, **kwargs):
+        return self.api.user.send_confirmation(
             callback=curry(self.instance_update, commit=commit), **kwargs)
 
     def api_account_create(self, commit=True, **kwargs):
