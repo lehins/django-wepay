@@ -11,7 +11,9 @@ from djwepay.forms import AccountEditForm
 from wepay.exceptions import WePayHTTPError
 from wepay.utils import cached_property
 
-__all__ = ['IPNView', 'OAuth2Mixin', 'AccountMixin', 'AccountEditView']
+__all__ = [
+    'IPNView', 'OAuth2Mixin', 'AccountMixin', 'AccountView'
+]
 
 
 class IPNView(View):
@@ -186,7 +188,7 @@ class AccountMixin(object):
             app = get_wepay_model('app').objects.get_current()
             try:
                 app.api_batch_create(batch_id, timeout=20)
-            except WePayError: pass
+            except WePayHTTPError: pass
         return account
 
 
