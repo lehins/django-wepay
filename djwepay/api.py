@@ -358,6 +358,10 @@ class CheckoutApi(Api):
         return self.account.access_token
 
     @cached_property
+    def checkout_uri(self):
+        return self.api_checkout()[1].get('checkout_uri', None)
+
+    @cached_property
     def redirect_uri(self):
         return self.api_checkout()[1].get('redirect_uri', None)
 

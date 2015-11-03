@@ -127,12 +127,11 @@ class OAuth2Mixin(object):
             raise AttributeError("%s - %s" % (
                 self.request.GET['error'], 
                 self.request.GET.get('error_description', '')))
-        try:
-            if self.request.method == 'POST':
-                code = self.request.POST.get('code')
-            else:
-                code = self.request.GET.get('code')
-        except KeyError:
+        if self.request.method == 'POST':
+            code = self.request.POST.get('code')
+        else:
+            code = self.request.GET.get('code')
+        if code is None:
             raise AttributeError("'code' is missing.")
         try:
             user, response = self.app.api_oauth2_token(
@@ -140,7 +139,7 @@ class OAuth2Mixin(object):
             return user
         except WePayHTTPError as exc:
             if exc.error_code == 1012: # the code has expired
-                raise AttributeError(str(e))
+                raise AttributeError(str(exc))
             raise
 
 

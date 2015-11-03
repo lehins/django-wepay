@@ -253,6 +253,11 @@ class CreditCard(CreditCardApi, BaseModel):
     email = models.CharField(max_length=255, blank=True)
     reference_id = models.CharField(max_length=255, blank=True)
     create_time = models.BigIntegerField(null=True)
+    input_source = models.CharField(max_length=255, blank=True)
+    virtual_terminal_mode = models.CharField(max_length=255, blank=True)
+    expiration_month = models.IntegerField(null=True)
+    expiration_year = models.IntegerField(null=True)
+    last_four = models.CharField(max_length=255, blank=True)
 
     class Meta(BaseModel.Meta):
         abstract = is_abstract('credit_card')

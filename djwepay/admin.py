@@ -15,10 +15,9 @@ class AppAdmin(admin.ModelAdmin):
     def get_readonly_fields(self, request, obj=None):
         fields = [
             'state', 'status', 'date_created', 'date_modified', 'theme_object',
-            'user', 'account'
         ]
         if obj:
-            fields.extend(['client_id', 'account'])
+            fields.extend(['user', 'client_id', 'account'])
         return fields
 
 if not is_abstract('app'):
