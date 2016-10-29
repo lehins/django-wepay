@@ -72,7 +72,7 @@ class Command(BaseCommand):
         api = WePayBackend(production=production, access_token=access_token)
 
         App = get_wepay_model('app')
-        app = App(client_id=client_id, client_secret=client_secret, production=production)
+        app = App(client_id=client_id, client_secret=client_secret)
         app.access_token = access_token
         app.api = api
         app.api_app()

@@ -1,7 +1,7 @@
+from django.apps import apps
 from django.conf import settings
 from django.core.cache import cache
 from django.core.urlresolvers import reverse
-from django.db.models.loading import get_model
 from django.utils.functional import LazyObject, curry
 
 from djwepay.signals import state_changed
@@ -56,7 +56,7 @@ def get_wepay_model(obj_name):
     model_name = get_wepay_model_name(obj_name)
     if model_name is None:
         return None
-    return get_model(*model_name.split('.'))
+    return apps.get_model(model_name)
 
 
 def is_abstract(obj_name):

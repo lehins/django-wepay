@@ -20,8 +20,8 @@ class AppAdmin(admin.ModelAdmin):
             fields.extend(['user', 'client_id', 'account'])
         return fields
 
-if not is_abstract('app'):
-    admin.site.register(get_wepay_model('app'), AppAdmin)
+#if not is_abstract('app'):
+#    admin.site.register(get_wepay_model('app'), AppAdmin)
 
 class UserAdmin(admin.ModelAdmin):
     list_display = ('user_id', 'user_name', 'email', 'state')
@@ -32,8 +32,8 @@ class UserAdmin(admin.ModelAdmin):
     )
     search_fields = ('user_id', 'user_name', 'email', 'state')
 
-if not is_abstract('user'):
-    admin.site.register(get_wepay_model('user'), UserAdmin)
+#if not is_abstract('user'):
+#    admin.site.register(get_wepay_model('user'), UserAdmin)
 
 class AccountAdmin(admin.ModelAdmin):
     list_display = (
@@ -45,5 +45,5 @@ class AccountAdmin(admin.ModelAdmin):
         'type', 'create_time', 'date_created', 'date_modified'
     )
 
-if not is_abstract('account'):
-    admin.site.register(get_wepay_model('account'), AccountAdmin)
+#if not is_abstract('account'):
+#    admin.site.register(get_wepay_model('account'), AccountAdmin)
